@@ -32,49 +32,60 @@ export function renderTemplate(spec: PageSpec): string {
 <meta property="og:description" content="${esc(spec.tagline)}">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#9889;</text></svg>">
 <style>
-  :root{--bg:#08090b;--panel:#0e1014;--line:#1e2228;--fg:#e8eaed;--muted:#8b929c;--acc:#4ade80;--acc-dim:#166534}
+  /* Black and white, Apple-flavoured: a full-bleed hero, tight display type,
+     and no hue anywhere. The dashboard renders this page as a thumbnail, so
+     the hero has to carry at very small sizes. */
+  :root{--bg:#ffffff;--grey:#f5f5f7;--line:#d2d2d7;--fg:#1d1d1f;--muted:#6e6e73;--dim:#86868b}
   *{box-sizing:border-box;margin:0;padding:0}
-  body{background:var(--bg);color:var(--fg);line-height:1.6;
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Helvetica,Arial,sans-serif;
-    -webkit-font-smoothing:antialiased}
-  body::before{content:"";position:fixed;inset:0;pointer-events:none;
-    background:radial-gradient(900px 500px at 50% -10%,rgba(74,222,128,.08),transparent 70%)}
-  .wrap{max-width:720px;margin:0 auto;padding:72px 24px 96px;position:relative}
-  .eyebrow{font:600 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.14em;
-    text-transform:uppercase;color:var(--acc);margin-bottom:20px}
-  h1{font-size:clamp(32px,6vw,52px);line-height:1.08;letter-spacing:-.02em;margin-bottom:18px}
-  .tagline{font-size:19px;color:var(--muted);margin-bottom:40px;max-width:56ch}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:28px}
-  .price{font:700 40px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:-.02em}
-  .price span{font-size:15px;color:var(--muted);font-weight:400;margin-left:8px}
-  ul{list-style:none;margin:22px 0 26px}
-  li{padding-left:26px;position:relative;margin-bottom:10px;color:#c8cdd4}
-  li::before{content:"→";position:absolute;left:0;color:var(--acc)}
-  button{width:100%;background:var(--acc);color:#04140a;border:0;border-radius:10px;
-    padding:15px 22px;font-size:16px;font-weight:650;cursor:pointer;transition:filter .15s}
-  button:hover{filter:brightness(1.08)}
-  button:disabled{opacity:.6;cursor:progress}
-  .who{margin-top:44px;padding-top:26px;border-top:1px solid var(--line);color:var(--muted);font-size:14px}
-  .disclosure{margin-top:14px;font:400 12.5px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;
-    color:#6f7681;border-left:2px solid var(--acc-dim);padding-left:12px}
-  .err{margin-top:14px;color:#f87171;font-size:14px;min-height:20px}
+  body{background:var(--bg);color:var(--fg);line-height:1.5;letter-spacing:-.01em;
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue",Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+
+  .hero{min-height:82vh;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;padding:80px 24px 64px;background:var(--grey);border-bottom:1px solid var(--line)}
+  .eyebrow{font-size:13px;font-weight:600;letter-spacing:.02em;color:var(--muted);margin-bottom:14px}
+  h1{font-size:clamp(44px,9vw,88px);line-height:1.03;letter-spacing:-.035em;font-weight:700;
+    max-width:14ch;margin-bottom:20px}
+  .tagline{font-size:clamp(18px,2.4vw,24px);color:var(--muted);max-width:46ch;
+    letter-spacing:-.015em;margin-bottom:34px}
+  .cta{display:flex;align-items:center;gap:18px;flex-wrap:wrap;justify-content:center}
+  .price{font-size:26px;font-weight:600;letter-spacing:-.02em}
+  .price span{font-size:15px;color:var(--dim);font-weight:400;margin-left:6px}
+  button{background:var(--fg);color:#fff;border:0;border-radius:980px;
+    padding:14px 32px;font-size:17px;font-weight:500;letter-spacing:-.01em;cursor:pointer;
+    font-family:inherit;transition:opacity .2s ease}
+  button:hover{opacity:.85}
+  button:disabled{opacity:.4;cursor:progress}
+  .err{margin-top:14px;color:var(--fg);font-size:14px;font-weight:500;min-height:20px}
+
+  .wrap{max-width:720px;margin:0 auto;padding:64px 24px 96px}
+  h2{font-size:13px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;
+    color:var(--dim);margin-bottom:18px}
+  ul{list-style:none;margin:0 0 44px}
+  li{padding:16px 0;border-bottom:1px solid var(--line);font-size:17px;color:var(--fg)}
+  li:first-child{border-top:1px solid var(--line)}
+  .who{color:var(--muted);font-size:15px;margin-bottom:28px}
+  .disclosure{padding-top:22px;border-top:1px solid var(--line);
+    font-size:12.5px;line-height:1.6;color:var(--dim)}
 </style>
 </head>
 <body>
-  <main class="wrap">
+  <header class="hero">
     <div class="eyebrow">${esc(spec.niche)}</div>
     <h1>${esc(spec.name)}</h1>
     <p class="tagline">${esc(spec.tagline)}</p>
-
-    <section class="card">
-      <div class="price">$${price}<span>one-time</span></div>
-      <ul>
-        ${bullets}
-      </ul>
+    <div class="cta">
+      <span class="price">$${price}<span>one-time</span></span>
       <button id="buy" type="button">Get it now</button>
-      <div class="err" id="err" role="alert"></div>
-    </section>
+    </div>
+    <div class="err" id="err" role="alert"></div>
+  </header>
 
+  <main class="wrap">
+    <h2>What you get</h2>
+    <ul>
+      ${bullets}
+    </ul>
     <p class="who">Built for ${esc(spec.targetCustomer)}. ${esc(spec.offer)}</p>
     <p class="disclosure">${esc(spec.disclosure)}</p>
   </main>
