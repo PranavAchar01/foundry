@@ -66,6 +66,8 @@ interface BuildResponse {
   username: string;
   businessId: string | null;
   url: string | null;
+  /** Written at build time so it can be read before it is sent. */
+  message: string | null;
   ms: number;
   error: string | null;
 }
@@ -179,9 +181,11 @@ export default function ClientRun({ onPeople, onSettled }: Props) {
   }, []);
 
   // Measured after the stage has re-rendered, so the height being centred is
-  // the height the sweep actually takes up rather than the button's.
+  // the height the sweep actually takes up rather than the button's. The last
+  // move is back to the middle: by then you are down among the tiles, and the
+  // send is a decision that should not be waiting off the top of the screen.
   useEffect(() => {
-    if (stage === 'scanning') glide('center');
+    if (stage === 'scanning' || stage === 'built') glide('center');
     if (stage === 'building') glide('top');
   }, [stage, glide]);
 
@@ -259,6 +263,7 @@ export default function ClientRun({ onPeople, onSettled }: Props) {
             businessId: j.businessId,
             url: j.url,
             buildMs: j.ms,
+            message: j.message,
           });
           onSettled();
         } catch (err) {
@@ -318,7 +323,11 @@ export default function ClientRun({ onPeople, onSettled }: Props) {
           return;
         }
         if (j.targets.length === 0) {
-          setError('nobody on the allowlist to build for');
+          // /plan answers 200 with an empty target list and its own reason when
+          // there is nobody it may build for. That reason is the useful one —
+          // overwriting it with a guess is how a live run stalls on a message
+          // that does not say what to fix.
+          setError(j.error ?? 'nobody on the allowlist to build for');
           setStage('idle');
           return;
         }
@@ -368,7 +377,7 @@ export default function ClientRun({ onPeople, onSettled }: Props) {
 
   const built = people.filter((p) => p.build === 'live').length;
   const sent = people.filter((p) => p.dm === 'sent').length;
-  const outreach = people.filter((p) => p.dm !== 'waiting' && p.dm !== 'skipped');
+  const outreach = people.filter((p) => p.dm !== 'skipped' && (p.message || p.dm !== 'waiting'));
 
   if (stage === 'idle') {
     return (
@@ -449,7 +458,7 @@ export default function ClientRun({ onPeople, onSettled }: Props) {
         {outreach.length > 0 && (
           <div className="overflow-hidden rounded-2xl border border-[var(--color-line)] bg-[var(--color-panel)]">
             <p className="border-b border-[var(--color-line)] px-5 py-2.5 font-mono text-[10px] tracking-[0.14em] text-[var(--color-dim)] uppercase">
-              outreach · what each person is being sent
+              outreach · {stage === 'built' ? 'read these before you send them' : 'what each person is being sent'}
             </p>
             {outreach.map((p) => (
               <div
@@ -463,6 +472,7 @@ export default function ClientRun({ onPeople, onSettled }: Props) {
                       p.dm === 'sent' ? 'text-[var(--color-acc)]' : 'text-[var(--color-dim)]'
                     }`}
                   >
+                    {p.dm === 'waiting' && 'drafted · not sent'}
                     {p.dm === 'sending' && 'sending…'}
                     {p.dm === 'sent' && `${p.followed ? 'followed · ' : ''}DM sent`}
                     {p.dm === 'failed' && `not sent — ${p.dmError ?? 'unknown'}`}

@@ -213,7 +213,8 @@ export default function Dashboard() {
               className="hero-eyebrow text-[13px] tracking-[0.12em] text-[var(--color-fg)] uppercase"
               style={{ textShadow: '0 1px 12px rgba(11,6,20,0.8)' }}
             >
-              An autonomous holding company · {live.length} companies live
+              An autonomous holding company · {live.length}{' '}
+              {live.length === 1 ? 'company' : 'companies'} live
             </p>
             <h1
               className="hero-title text-[clamp(48px,7.2vw,88px)] leading-[1.05] font-normal tracking-[-0.015em] text-white"

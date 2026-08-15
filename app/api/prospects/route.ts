@@ -11,7 +11,7 @@ export async function GET() {
   try {
     return json({
       note:
-        'Drafts. Sending happens only through /api/demo/run and only to accounts on the ' +
+        'Drafts. Sending happens only through /api/demo/reach and only to accounts on the ' +
         'contact allowlist (/api/cohort) — anyone else cannot be messaged.',
       drafts: await prospects.drafts(),
     });

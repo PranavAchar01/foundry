@@ -464,7 +464,7 @@ write here persists between cycles.
 - **Niche**: ${spec.niche}
 - **Customer**: ${spec.targetCustomer}
 - **Offer**: ${spec.offer}
-- **Price**: $${(spec.priceCents / 100).toFixed(2)} one-time
+- **Price**: $${(spec.priceCents / 100).toFixed(2)} per ${env.billingInterval}, recurring
 - **Storefront**: ${spec.url}
 - **Thesis**: ${spec.thesis}
 

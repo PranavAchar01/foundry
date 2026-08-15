@@ -34,18 +34,9 @@ export async function POST(req: Request) {
     if (!member) return fail('not on the allowlist', 403);
     if (!member.x_user_id) return fail('no resolved X id', 409);
 
-    const business = await personal.businessFor(runId, username);
-    if (!business) return fail('this run has not built anything for this person yet', 409);
-
-    const { draft, model } = await personal.openerFor({
-      person: { username: member.username, bio: business.prospect_bio || member.bio },
-      business: {
-        id: business.id,
-        name: business.name,
-        tagline: business.tagline,
-        priceCents: business.price_cents,
-      },
-    });
+    const prepared = await personal.draftFor(runId, username);
+    if (!prepared) return fail('this run has not built anything for this person yet', 409);
+    const { draft, model, business } = prepared;
 
     // Belt and braces: re-check the allowlist immediately before writing.
     const gate = await cohort.isAllowed(username);
