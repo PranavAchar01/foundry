@@ -149,9 +149,62 @@ export class InternalPagegenProvider implements PagegenProvider {
 }
 
 /**
- * Sponsor path: lovable.dev generates the landing page. Falls back to the
- * internal template only if the remote call fails — a spawn must not die
- * because a sponsor API had a bad minute.
+ * The brief handed to Lovable's agent.
+ *
+ * Everything under "REQUIRED BEHAVIOUR" is load-bearing: FOUNDRY's checkout,
+ * its pageview beacon, and the disclosure line are the contract between a
+ * spawned storefront and the holding company. The wording is deliberately
+ * imperative and literal — this prompt was iterated against the live agent
+ * until the built page drove a real Stripe session end to end.
+ */
+export function lovableBrief(spec: PageSpec): string {
+  return `Build a single-page marketing landing page for a real product. Keep it to one page, no routing, no auth, no backend.
+
+PRODUCT
+- Name: ${spec.name}
+- For: ${spec.targetCustomer}
+- Tagline: ${spec.tagline}
+- Price: $${(spec.priceCents / 100).toFixed(2)} one-time
+- What the buyer gets: ${spec.offer}
+${spec.bullets.length ? `- Key points:\n${spec.bullets.map((b) => `  * ${b}`).join('\n')}` : ''}
+
+REQUIRED BEHAVIOUR — this must be exact, because a payment system depends on it:
+
+1. The primary call-to-action must be a <button> with the literal attribute id="buy" and visible text "Get it now".
+2. When clicked, it must POST to ${spec.checkoutEndpoint}
+   with header content-type: application/json
+   and body exactly: {"businessId":"${spec.businessId}"}
+   Then read the JSON response and set window.location.href to the response's "url" field.
+   If the response is not ok, or has no url, show the response's "error" field as visible text near the button and re-enable it. Disable the button while the request is in flight.
+3. On page load, fire a POST to ${spec.beaconEndpoint}
+   with body {"businessId":"${spec.businessId}","path":"/","referrer":document.referrer}
+   Ignore its response and never block rendering on it. Wrap it so a failure is silent.
+4. The footer must contain this sentence verbatim, as plain visible text:
+   ${spec.disclosure}
+
+CONTENT RULES — do not violate these:
+- No medical, legal, or financial claims.
+- No guarantees of results, income, or outcomes.
+- Nothing aimed at minors.
+- Do not invent testimonials, customer logos, user counts, or review scores. No fake social proof of any kind.
+
+STYLE
+Dark, high-contrast, technical. Monospace for numbers and labels. Restrained — one accent colour. It should read like a tool built by an engineer, not a marketing page. Mobile responsive.`;
+}
+
+/**
+ * Sponsor path: lovable.dev builds the storefront.
+ *
+ * Lovable is not a template renderer — it builds and *hosts* a full TypeScript
+ * app, so this provider returns a `hostedUrl` and empty `html`. `spawn` sees
+ * the hosted URL and skips the HostProvider rather than deploying a second,
+ * divergent copy of the same storefront.
+ *
+ * The transport is Lovable's MCP endpoint speaking JSON-RPC 2.0. The three
+ * tools used here — create_project, get_project, deploy_project — and their
+ * argument shapes were read off the live server, and the whole path was driven
+ * end to end: the built page called FOUNDRY's /api/checkout and redirected to a
+ * real Stripe session.
  */
 export class LovablePagegenProvider implements PagegenProvider {
   readonly info = {
@@ -161,42 +214,134 @@ export class LovablePagegenProvider implements PagegenProvider {
     requires: ['LOVABLE_API_KEY'],
   };
 
-  constructor(private readonly apiKey = env.lovableApiKey) {}
+  constructor(
+    private readonly apiKey = env.lovableApiKey,
+    private readonly mcpUrl = env.lovableMcpUrl,
+  ) {}
 
-  async generate(spec: PageSpec): Promise<GeneratedPage> {
+  /** One JSON-RPC tools/call against Lovable's MCP endpoint. */
+  private async call<T>(tool: string, args: Record<string, unknown>): Promise<T> {
     if (!this.apiKey) throw new Error('LOVABLE_API_KEY is not set');
 
-    const prompt = [
-      `Build a single-file HTML landing page for "${spec.name}" (${spec.niche}).`,
-      `Tagline: ${spec.tagline}`,
-      `Offer: ${spec.offer} for ${spec.targetCustomer}, priced at $${(spec.priceCents / 100).toFixed(2)}.`,
-      `The primary CTA button must have id="buy" and POST {"businessId":"${spec.businessId}"} to ${spec.checkoutEndpoint}, then redirect to the returned "url".`,
-      `On load, POST {"businessId":"${spec.businessId}"} to ${spec.beaconEndpoint}.`,
-      `Include this disclosure verbatim in the footer: ${spec.disclosure}`,
-      'Return only HTML.',
-    ].join('\n');
-
-    const res = await fetch('https://api.lovable.dev/v1/generate', {
+    const res = await fetch(this.mcpUrl, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${this.apiKey}`,
         'content-type': 'application/json',
+        accept: 'application/json, text/event-stream',
       },
-      body: JSON.stringify({ prompt, format: 'html', project: spec.slug }),
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: `foundry-${Date.now().toString(36)}`,
+        method: 'tools/call',
+        params: { name: tool, arguments: args },
+      }),
     });
 
     if (!res.ok) {
-      throw new Error(`lovable generate failed: ${res.status} ${await res.text().catch(() => '')}`);
+      throw new Error(`lovable ${tool} -> ${res.status} ${(await res.text().catch(() => '')).slice(0, 300)}`);
     }
 
-    const json = (await res.json()) as { html?: string; output?: string };
-    const html = json.html ?? json.output;
-    if (!html || !html.includes(spec.businessId)) {
-      // A page that lost the business id cannot be wired to checkout. Reject it.
-      throw new Error('lovable returned a page without the checkout wiring');
+    const envelope = parseRpc(await res.text());
+    if (envelope.error) {
+      throw new Error(`lovable ${tool}: ${envelope.error.message ?? JSON.stringify(envelope.error)}`);
     }
-    return { html, provider: 'lovable' };
+
+    // MCP returns tool output as content blocks; the JSON payload is the text
+    // of the first block. `structuredContent` is preferred when present.
+    const result = envelope.result ?? {};
+    if (result.structuredContent) return result.structuredContent as T;
+
+    const text = (result.content ?? []).find((c) => c.type === 'text')?.text;
+    if (!text) throw new Error(`lovable ${tool} returned no content`);
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      throw new Error(`lovable ${tool} returned non-JSON content`);
+    }
   }
+
+  async generate(spec: PageSpec): Promise<GeneratedPage> {
+    const created = await this.call<{ id?: string; project?: { id?: string } }>('create_project', {
+      ...(env.lovableWorkspaceId ? { workspace_id: env.lovableWorkspaceId } : {}),
+      initial_message: lovableBrief(spec),
+      wait: true,
+      timeout_seconds: Math.min(600, env.lovableBuildTimeout),
+    });
+
+    const projectId = created.id ?? created.project?.id;
+    if (!projectId) throw new Error('lovable create_project returned no project id');
+
+    // create_project can return before the agent finishes; wait for the build.
+    await this.awaitReady(projectId);
+
+    const deployed = await this.call<{ url?: string; preview_url?: string }>('deploy_project', {
+      project_id: projectId,
+      name: `foundry-${spec.slug}`.slice(0, 60),
+    });
+
+    const hostedUrl = deployed.url ?? deployed.preview_url;
+    if (!hostedUrl) throw new Error('lovable deploy_project returned no URL');
+
+    // Publishing is asynchronous; do not hand back a URL that 404s.
+    await waitReachable(hostedUrl);
+
+    return { html: '', provider: 'lovable', hostedUrl, projectId };
+  }
+
+  private async awaitReady(projectId: string): Promise<void> {
+    const deadline = Date.now() + env.lovableBuildTimeout * 1000;
+    while (Date.now() < deadline) {
+      const project = await this.call<{ status?: string; project?: { status?: string } }>(
+        'get_project',
+        { project_id: projectId },
+      );
+      const status = project.status ?? project.project?.status;
+      if (status === 'completed' || status === 'ready') return;
+      if (status === 'failed' || status === 'error') {
+        throw new Error(`lovable build ${status} for ${projectId}`);
+      }
+      await sleep(5000);
+    }
+    throw new Error(`lovable build did not finish within ${env.lovableBuildTimeout}s`);
+  }
+}
+
+interface RpcEnvelope {
+  result?: { content?: { type: string; text?: string }[]; structuredContent?: unknown };
+  error?: { message?: string };
+}
+
+/**
+ * The endpoint may answer as plain JSON or as an SSE stream, depending on the
+ * Accept negotiation. Handle both rather than assuming.
+ */
+function parseRpc(body: string): RpcEnvelope {
+  const trimmed = body.trim();
+  if (trimmed.startsWith('{')) return JSON.parse(trimmed) as RpcEnvelope;
+
+  for (const line of trimmed.split('\n')) {
+    if (!line.startsWith('data:')) continue;
+    const payload = line.slice(5).trim();
+    if (payload && payload !== '[DONE]') return JSON.parse(payload) as RpcEnvelope;
+  }
+  throw new Error('lovable returned an unreadable response envelope');
+}
+
+async function waitReachable(url: string, timeoutMs = 120_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const ok = await fetch(url, { headers: { 'user-agent': 'foundry-pagegen/1.0' } })
+      .then((r) => r.ok)
+      .catch(() => false);
+    if (ok) return;
+    await sleep(5000);
+  }
+  // Not fatal: QA runs next and will report an unreachable storefront properly.
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
 }
 
 export const PAGEGEN_IMPLEMENTATIONS: Record<string, () => PagegenProvider> = {

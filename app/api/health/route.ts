@@ -25,9 +25,12 @@ export async function GET() {
       : 'STRIPE_SECRET_KEY missing',
   };
 
-  checks.anthropic = {
-    ok: Boolean(env.anthropicApiKey),
-    detail: env.anthropicApiKey ? `model ${env.model}` : 'ANTHROPIC_API_KEY missing',
+  const brainKey = env.brainProvider === 'openai' ? env.openaiApiKey : env.anthropicApiKey;
+  checks.brain = {
+    ok: Boolean(brainKey),
+    detail: brainKey
+      ? `provider=${env.brainProvider} model=${env.activeModel}`
+      : `${env.brainProvider} selected but its API key is missing`,
   };
 
   checks.labor = {

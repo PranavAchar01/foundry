@@ -11,6 +11,9 @@ importers:
       '@anthropic-ai/sdk':
         specifier: ^0.71.0
         version: 0.71.2(zod@4.4.3)
+      '@superserve/sdk':
+        specifier: ^0.8.2
+        version: 0.8.2
       '@vercel/sandbox':
         specifier: ^3.0.0
         version: 3.0.0
@@ -709,6 +712,9 @@ packages:
 
   '@rushstack/eslint-patch@1.16.1':
     resolution: {integrity: sha512-TvZbIpeKqGQQ7X0zSCvPH9riMSFQFSggnfBjFZ1mEoILW+UuXCKwOoPcgjMwiUtRqFZ8jWhPJc4um14vC6I4ag==}
+
+  '@superserve/sdk@0.8.2':
+    resolution: {integrity: sha512-U7aBzhd+cSMeeuKsFOMAyzodtq2Iph/FbOfu1fAGxdPprSfNTUHPxYb6BhHPn9tKL8nBBpKhTJU7nUIVWobLIA==}
 
   '@swc/helpers@0.5.15':
     resolution: {integrity: sha512-JQ5TuMi45Owi4/BIMAJBoSQoOJu12oOk/gADqlcUL9JEdHB8vyjUSsxqeNXnmXHjYKMi2WcYtezGEEhqUI/E2g==}
@@ -2973,6 +2979,8 @@ snapshots:
   '@rtsao/scc@1.1.0': {}
 
   '@rushstack/eslint-patch@1.16.1': {}
+
+  '@superserve/sdk@0.8.2': {}
 
   '@swc/helpers@0.5.15':
     dependencies:

@@ -73,7 +73,17 @@ export class Sandbox0Provider implements SandboxProvider {
   }
 }
 
-/** Sponsor path: superserve.ai long-lived agent sandboxes. */
+/**
+ * Sponsor path: superserve.ai — persistent Firecracker microVMs.
+ *
+ * Unlike Vercel Sandbox, a Superserve machine outlives the request that made
+ * it: it can be paused, resumed, reconnected to by id, and can publish a
+ * preview port. That is what lets each spawned business own a machine it keeps
+ * operating from, rather than a scratch container per call. See lib/machine.ts.
+ *
+ * `run()` here is the one-shot form required by the SandboxProvider contract:
+ * it creates a machine, runs the command, and kills it.
+ */
 export class SuperserveSandboxProvider implements SandboxProvider {
   readonly info = {
     capability: 'sandbox',
@@ -86,20 +96,26 @@ export class SuperserveSandboxProvider implements SandboxProvider {
 
   async run(cmd: string, args: string[], opts: { timeoutMs?: number } = {}): Promise<SandboxRun> {
     if (!this.apiKey) throw new Error('SUPERSERVE_API_KEY is not set');
-    const res = await fetch('https://api.superserve.ai/v1/sandboxes/exec', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${this.apiKey}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ cmd, args, timeout_ms: opts.timeoutMs ?? 120_000 }),
+    const { Sandbox } = await import('@superserve/sdk');
+
+    const box = await Sandbox.create({
+      apiKey: this.apiKey,
+      name: `foundry-oneshot-${Date.now().toString(36)}`,
     });
-    if (!res.ok) throw new Error(`superserve -> ${res.status} ${await res.text().catch(() => '')}`);
-    const j = (await res.json()) as { id?: string; exitCode?: number; stdout?: string; stderr?: string };
-    return {
-      id: j.id ?? 'superserve',
-      exitCode: j.exitCode ?? 0,
-      stdout: j.stdout ?? '',
-      stderr: j.stderr ?? '',
-      provider: 'superserve',
-    };
+    try {
+      const result = await box.commands.run([cmd, ...args].join(' '), {
+        timeoutMs: opts.timeoutMs ?? 120_000,
+      });
+      return {
+        id: box.id,
+        exitCode: result.exitCode,
+        stdout: result.stdout ?? '',
+        stderr: result.stderr ?? '',
+        provider: 'superserve',
+      };
+    } finally {
+      await box.kill().catch(() => {});
+    }
   }
 }
 

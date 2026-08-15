@@ -30,6 +30,8 @@ const EXPECTED = [
   'visits',
   'bus_messages',
   'circuit_breaker',
+  'machines',
+  'machine_runs',
 ];
 
 await client.connect();

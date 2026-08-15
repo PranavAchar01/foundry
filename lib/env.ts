@@ -31,6 +31,26 @@ export const env = {
   get model() {
     return str('FOUNDRY_MODEL', 'claude-opus-5');
   },
+  get openaiApiKey() {
+    return str('OPENAI_API_KEY');
+  },
+  get openaiModel() {
+    return str('FOUNDRY_OPENAI_MODEL', 'gpt-5.5');
+  },
+  /**
+   * Which vendor does the thinking. Explicit flag wins; otherwise Anthropic
+   * when it has a key, else OpenAI. Keeps the portfolio from being hostage to
+   * one account's credit balance.
+   */
+  get brainProvider(): 'anthropic' | 'openai' {
+    const explicit = str('FOUNDRY_BRAIN_PROVIDER').toLowerCase();
+    if (explicit === 'anthropic' || explicit === 'openai') return explicit;
+    return this.anthropicApiKey ? 'anthropic' : 'openai';
+  },
+  /** The model string of whichever brain is active. */
+  get activeModel() {
+    return this.brainProvider === 'openai' ? this.openaiModel : this.model;
+  },
 
   // ---- money ----
   get stripeSecretKey() {
@@ -162,6 +182,22 @@ export const env = {
   get lovableApiKey() {
     return str('LOVABLE_API_KEY');
   },
+  /**
+   * Lovable's programmatic surface is an MCP endpoint speaking JSON-RPC 2.0.
+   * The tool names and argument shapes in lib/providers/pagegen.ts were read
+   * off the live server, so only this URL and the key are configuration.
+   */
+  get lovableMcpUrl() {
+    return str('LOVABLE_MCP_URL', 'https://mcp.lovable.dev/mcp');
+  },
+  /** Optional: Lovable picks the sole eligible workspace when this is unset. */
+  get lovableWorkspaceId() {
+    return str('LOVABLE_WORKSPACE_ID');
+  },
+  /** Seconds Lovable's agent may spend building one site before spawn moves on. */
+  get lovableBuildTimeout() {
+    return num('LOVABLE_BUILD_TIMEOUT_SECONDS', 420);
+  },
   get renderApiKey() {
     return str('RENDER_API_KEY');
   },
@@ -180,8 +216,28 @@ export const env = {
   get superserveApiKey() {
     return str('SUPERSERVE_API_KEY');
   },
+  /** Dollars per machine-hour, booked as OPEX for every business VM. */
+  get machineCostPerHour() {
+    return num('FOUNDRY_MACHINE_USD_PER_HOUR', 0.05);
+  },
+  /** Idle minutes before a business VM is paused to stop the meter. */
+  get machineIdleMinutes() {
+    return num('FOUNDRY_MACHINE_IDLE_MINUTES', 15);
+  },
+  /** Human key. Band's Human API is Enterprise-gated; this mints agent keys. */
   get bandApiKey() {
     return str('BAND_API_KEY');
+  },
+  /** Agent key from `pnpm band:register`. This is what the bus actually uses. */
+  get bandAgentApiKey() {
+    return str('BAND_AGENT_API_KEY');
+  },
+  get bandAgentId() {
+    return str('BAND_AGENT_ID');
+  },
+  /** Band chat room the CEO publishes its cycle events into. */
+  get bandChatId() {
+    return str('BAND_CHAT_ID');
   },
   get linqApiKey() {
     return str('LINQ_API_KEY');

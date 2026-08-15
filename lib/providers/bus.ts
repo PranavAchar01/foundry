@@ -45,44 +45,98 @@ export class PostgresBusProvider implements BusProvider {
   }
 }
 
-/** Sponsor path: band.ai multi-agent coordination bus. */
+/**
+ * Sponsor path: band.ai — persistent agent identity and multi-agent chat rooms.
+ *
+ * Two things learned from the live API and encoded here:
+ *   1. Auth is `X-API-Key`, not a bearer token.
+ *   2. Band's *Human* API (`/me/*`) is Enterprise-gated, but the *Agent* API
+ *      (`/agent/*`) is not. So the bus authenticates as a registered agent,
+ *      whose key `pnpm band:register` mints once and stores as
+ *      BAND_AGENT_API_KEY.
+ *
+ * A topic maps to a Band chat room, so the coordination log is a conversation a
+ * human can open and read rather than an opaque queue.
+ */
 export class BandBusProvider implements BusProvider {
   readonly info = {
     capability: 'bus',
     name: 'band',
-    configured: Boolean(env.bandApiKey),
-    requires: ['BAND_API_KEY'],
+    configured: Boolean(env.bandAgentApiKey),
+    requires: ['BAND_AGENT_API_KEY'],
   };
 
-  constructor(private readonly apiKey = env.bandApiKey) {}
+  private readonly base = 'https://app.band.ai/api/v1';
+  /** topic -> chat room id, resolved once per process. */
+  private rooms = new Map<string, string>();
+
+  constructor(private readonly apiKey = env.bandAgentApiKey) {}
 
   private async call<T>(method: string, path: string, body?: unknown): Promise<T> {
-    if (!this.apiKey) throw new Error('BAND_API_KEY is not set');
-    const res = await fetch(`https://api.band.ai/v1${path}`, {
+    if (!this.apiKey) {
+      throw new Error('BAND_AGENT_API_KEY is not set — run `pnpm band:register` to mint one');
+    }
+    const res = await fetch(`${this.base}${path}`, {
       method,
-      headers: { Authorization: `Bearer ${this.apiKey}`, ...(body ? { 'content-type': 'application/json' } : {}) },
+      headers: { 'X-API-Key': this.apiKey, ...(body ? { 'content-type': 'application/json' } : {}) },
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
-    if (!res.ok) throw new Error(`band ${path} -> ${res.status} ${await res.text().catch(() => '')}`);
+    if (!res.ok) {
+      throw new Error(`band ${method} ${path} -> ${res.status} ${(await res.text().catch(() => '')).slice(0, 200)}`);
+    }
     return (res.status === 204 ? undefined : await res.json()) as T;
   }
 
+  /** Finds the chat room for a topic, creating it on first use. */
+  private async room(topic: string): Promise<string> {
+    const cached = this.rooms.get(topic);
+    if (cached) return cached;
+
+    const name = `foundry:${topic}`;
+    const list = await this.call<{ data?: { id: string; name: string }[] }>('GET', '/agent/chats');
+    const found = (list.data ?? []).find((c) => c.name === name);
+    if (found) {
+      this.rooms.set(topic, found.id);
+      return found.id;
+    }
+
+    const made = await this.call<{ data?: { id: string } }>('POST', '/agent/chats', { chat: { name } });
+    const id = made.data?.id;
+    if (!id) throw new Error(`band could not create a chat room for ${topic}`);
+    this.rooms.set(topic, id);
+    return id;
+  }
+
   async publish(topic: string, payload: Record<string, unknown>): Promise<{ id: string }> {
-    const j = await this.call<{ id: string }>('POST', '/messages', { topic, payload });
-    return { id: j.id };
+    const chatId = await this.room(topic);
+    const out = await this.call<{ data?: { id: string } }>(
+      'POST',
+      `/agent/chats/${chatId}/messages`,
+      { message: { content: JSON.stringify(payload) } },
+    );
+    return { id: out.data?.id ?? '' };
   }
 
   async consume(topic: string, limit = 10): Promise<BusMessage[]> {
-    const j = await this.call<{ data: { id: string; topic: string; payload: Record<string, unknown> }[] }>(
-      'POST',
-      '/messages/claim',
-      { topic, limit },
+    const chatId = await this.room(topic);
+    const out = await this.call<{ data?: { id: string; content: string }[] }>(
+      'GET',
+      `/agent/chats/${chatId}/messages?limit=${limit}`,
     );
-    return (j.data ?? []).map((m) => ({ id: m.id, topic: m.topic, payload: m.payload }));
+    return (out.data ?? []).map((m) => {
+      let parsed: Record<string, unknown>;
+      try {
+        parsed = JSON.parse(m.content) as Record<string, unknown>;
+      } catch {
+        parsed = { content: m.content };
+      }
+      return { id: m.id, topic, payload: parsed };
+    });
   }
 
   async ack(messageId: string): Promise<void> {
-    await this.call<void>('POST', `/messages/${messageId}/ack`);
+    // Band tracks per-message processing state on the agent's inbox.
+    await this.call<void>('POST', `/agent/messages/${messageId}/processed`).catch(() => {});
   }
 }
 

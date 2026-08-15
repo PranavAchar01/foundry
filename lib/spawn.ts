@@ -2,7 +2,7 @@ import { env } from './env';
 import { id, query } from './db';
 import * as decisions from './decisions';
 import * as businesses from './businesses';
-import { authorizeSpend, requiresHumanEscalation } from './guardrails';
+import { authorizeSpend, breakerState, requiresHumanEscalation } from './guardrails';
 import { proposeHypothesis, slugify, type Hypothesis } from './agent';
 import { hostProvider, pagegenProvider, qaProvider } from './providers';
 import type { PageSpec } from './providers/types';
@@ -66,6 +66,18 @@ export async function spawn(input: SpawnInput): Promise<SpawnResult> {
       qa: null, decisionId: row.id, error, guardrailCode: code,
     };
   };
+
+  // --- guardrail: the emergency stop outranks every other check ------------
+  // Checked first and explicitly: when the breaker is latched the answer must
+  // be "the breaker is tripped", not whichever ceiling happens to be nearest.
+  const breaker = await breakerState();
+  if (env.circuitBreaker && breaker.tripped) {
+    return fail(
+      `Refused to spawn: circuit breaker is tripped (${breaker.reason || 'no reason recorded'}).`,
+      'CIRCUIT_BREAKER_TRIPPED',
+      null,
+    );
+  }
 
   // --- guardrail: legally-exposed niches never auto-spawn -------------------
   const flagged = requiresHumanEscalation(input.niche);
@@ -147,18 +159,31 @@ export async function spawn(input: SpawnInput): Promise<SpawnResult> {
   mark('pagegen', t, page.provider);
 
   // --- 3. deploy ------------------------------------------------------------
+  // A pagegen provider may have published the site itself (Lovable builds and
+  // hosts a full app rather than returning a file). Deploying a copy would give
+  // the business two storefronts that drift apart, so use what it published.
   t = Date.now();
-  const host = hostProvider();
-  let deployed;
-  try {
-    deployed = await host.deploy({
-      slug,
-      files: [{ path: 'index.html', content: page.html }],
-    });
-  } catch (err) {
-    return fail(`Deploy failed: ${String(err).slice(0, 400)}`, null, hypothesis);
+  let deployed: { url: string; deploymentId: string; provider: string; ready: boolean };
+  if (page.hostedUrl) {
+    deployed = {
+      url: page.hostedUrl,
+      deploymentId: page.projectId ?? '',
+      provider: page.provider,
+      ready: true,
+    };
+    mark('deploy', t, `hosted by ${page.provider}: ${deployed.url}`);
+  } else {
+    const host = hostProvider();
+    try {
+      deployed = await host.deploy({
+        slug,
+        files: [{ path: 'index.html', content: page.html }],
+      });
+    } catch (err) {
+      return fail(`Deploy failed: ${String(err).slice(0, 400)}`, null, hypothesis);
+    }
+    mark('deploy', t, `${deployed.provider} ${deployed.url}`);
   }
-  mark('deploy', t, `${deployed.provider} ${deployed.url}`);
 
   // --- 4. persist -----------------------------------------------------------
   t = Date.now();
@@ -203,7 +228,35 @@ export async function spawn(input: SpawnInput): Promise<SpawnResult> {
   });
   mark('persist', t, businessId);
 
-  // --- 5. QA ----------------------------------------------------------------
+  // --- 5. machine -----------------------------------------------------------
+  // The business's own persistent VM. Best-effort: a business without a machine
+  // still sells, it just has no operator working on it between cycles.
+  t = Date.now();
+  let machineDetail = 'skipped (no SUPERSERVE_API_KEY)';
+  if (env.superserveApiKey) {
+    try {
+      const { provision } = await import('./machine');
+      const provisioned = await provision({
+        businessId,
+        name: hypothesis.name,
+        niche: input.niche,
+        offer: hypothesis.offer,
+        targetCustomer: hypothesis.targetCustomer,
+        priceCents: hypothesis.priceCents,
+        url: deployed.url,
+        thesis: hypothesis.thesis,
+        cycleId,
+      });
+      machineDetail = provisioned.ok
+        ? `provisioned ${provisioned.machine?.external_id}`
+        : `declined: ${provisioned.reason}`;
+    } catch (err) {
+      machineDetail = `failed: ${String(err).slice(0, 140)}`;
+    }
+  }
+  mark('machine', t, machineDetail);
+
+  // --- 6. QA ----------------------------------------------------------------
   t = Date.now();
   const qa = await qaProvider()
     .verify({

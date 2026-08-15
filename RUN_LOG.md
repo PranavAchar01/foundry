@@ -355,3 +355,62 @@ three HOLDs each citing the real numbers, and one SPAWN
 Final gate: lint clean · typecheck clean · build clean · 30 passed / 1 skipped.
 
 **All eleven targets verified.**
+
+## 2026-08-15 — Lovable: website generation via the sponsor path
+
+Scope: the pagegen capability only. The in-flight machine/Replay/Band work in
+the tree was left untouched.
+
+**Found the real interface first.** The previous `LovablePagegenProvider` posted
+to `https://api.lovable.dev/v1/generate` — an endpoint I had guessed and never
+verified. Read the live Lovable MCP server instead: it exposes
+`create_project`, `get_project`, `deploy_project`, `send_message`, and Lovable
+**builds and hosts** a full TypeScript app (TanStack Start + Tailwind). It never
+returns HTML. That breaks the old `generate() -> html` contract outright.
+
+**Proved the path by hand before writing any code.** Built a real site for the
+live business `biz_msu8lgocg2nqtm` (Changelog Engine, $29.00), published it, and
+drove it in a browser:
+
+```
+https://foundry-changelog-engine.lovable.app   200, 17441 bytes
+  id="buy"          present in served HTML   (SSR, not client-only)
+  disclosure line   present in served HTML
+  businessId / /api/checkout / /api/track     NOT in HTML — they live in the JS bundle
+  clicked "Get it now" -> redirected to checkout.stripe.com
+                       -> "Changelog Engine  $29.00", merchant "Foundry"
+```
+
+Two findings that shaped the design:
+1. Lovable hosts the result, so spawning must **not** also deploy to Vercel —
+   that would give one business two storefronts that drift apart.
+2. The wiring is in the bundle, not the markup, so HTML string-matching cannot
+   verify checkout. QA's existing `expect` list is `[name, disclosureLine]` and
+   both *are* server-rendered, so QA needed no change; the browser check in the
+   Playwright provider is what covers the button.
+
+**Changes, all pagegen-scoped:**
+- `GeneratedPage` gains optional `hostedUrl` and `projectId`.
+- `spawn()` uses `page.hostedUrl` as the business URL and skips the HostProvider
+  when a pagegen provider already published the site.
+- `LovablePagegenProvider` rewritten to speak MCP JSON-RPC 2.0 against
+  `LOVABLE_MCP_URL` (create_project -> poll get_project -> deploy_project),
+  handling both plain-JSON and SSE response envelopes. The brief it sends is the
+  exact prompt proven above, extracted as `lovableBrief()` so it is testable.
+- `tests/lovable.test.ts` (11 tests) asserts the brief still carries every part
+  of the contract — `id="buy"`, the checkout endpoint, the literal
+  `{"businessId":"…"}` body, the redirect, the beacon, the verbatim disclosure,
+  and the content prohibitions. If that prompt drifts, checkout breaks silently
+  on a live site; this is the guard.
+
+**Adopted the result.** `biz_msu8lgocg2nqtm` now points at the Lovable
+storefront instead of its Vercel page, with a `STOREFRONT_REPLACED` decision row
+recording the swap and the browser verification.
+
+Gate: typecheck clean · build clean · **41 passed / 8 skipped**. `pnpm lint`
+fails on one pre-existing unused import in `lib/operator.ts` (the machine
+thread's file, not touched here).
+
+**Not verified:** the MCP transport itself. `LOVABLE_API_KEY` is empty, so the
+provider cannot run unattended yet — the tool contract is verified, the endpoint
+and key are configuration.

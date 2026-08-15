@@ -158,6 +158,48 @@ CREATE TABLE IF NOT EXISTS circuit_breaker (
 INSERT INTO circuit_breaker (id, tripped) VALUES (1, false)
 ON CONFLICT (id) DO NOTHING;
 
+-- One persistent virtual machine per business. This is the machine the
+-- business's operator agent actually runs the company from: it writes files,
+-- runs commands, and keeps state between CEO cycles. Metered as OPEX by the
+-- second, paused when idle, and killed when the business is killed.
+CREATE TABLE IF NOT EXISTS machines (
+  id             TEXT PRIMARY KEY,
+  business_id    TEXT        NOT NULL REFERENCES businesses (id),
+  provider       TEXT        NOT NULL DEFAULT 'superserve',
+  external_id    TEXT        NOT NULL,
+  status         TEXT        NOT NULL DEFAULT 'active'
+                  CHECK (status IN ('active', 'paused', 'killed')),
+  preview_url    TEXT        NOT NULL DEFAULT '',
+  -- Billable seconds accumulated across every active period.
+  billed_seconds BIGINT      NOT NULL DEFAULT 0,
+  last_started_at TIMESTAMPTZ,
+  last_used_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  killed_at      TIMESTAMPTZ,
+  meta           JSONB       NOT NULL DEFAULT '{}'::jsonb,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS machines_one_live_per_business
+  ON machines (business_id) WHERE status <> 'killed';
+
+-- Every command the operator agent ran on a business machine, with its output.
+-- Append-only: this is the record of what the agent actually did, not what it
+-- said it did.
+CREATE TABLE IF NOT EXISTS machine_runs (
+  id          TEXT PRIMARY KEY,
+  machine_id  TEXT        NOT NULL REFERENCES machines (id),
+  business_id TEXT        NOT NULL,
+  cycle_id    TEXT        NOT NULL DEFAULT '',
+  command     TEXT        NOT NULL,
+  exit_code   INTEGER     NOT NULL DEFAULT 0,
+  stdout      TEXT        NOT NULL DEFAULT '',
+  stderr      TEXT        NOT NULL DEFAULT '',
+  duration_ms INTEGER     NOT NULL DEFAULT 0,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS machine_runs_business_idx ON machine_runs (business_id, created_at DESC);
+
 -- ---------------------------------------------------------------------------
 -- Forward migrations for databases created by an earlier revision.
 -- ---------------------------------------------------------------------------
@@ -185,4 +227,9 @@ CREATE TRIGGER ledger_entries_append_only
 DROP TRIGGER IF EXISTS decisions_append_only ON decisions;
 CREATE TRIGGER decisions_append_only
   BEFORE UPDATE OR DELETE ON decisions
+  FOR EACH ROW EXECUTE FUNCTION foundry_append_only();
+
+DROP TRIGGER IF EXISTS machine_runs_append_only ON machine_runs;
+CREATE TRIGGER machine_runs_append_only
+  BEFORE UPDATE OR DELETE ON machine_runs
   FOR EACH ROW EXECUTE FUNCTION foundry_append_only();
