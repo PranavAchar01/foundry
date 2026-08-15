@@ -319,12 +319,52 @@ export interface Product {
 }
 
 /**
- * Writes the opener for one person and puts it on the record before it is sent.
+ * The opener for this person in this run, written once and then reused.
+ *
+ * `openerFor` asks the model afresh every call, so generating at build time and
+ * again at send time would show one message on screen and put a different one
+ * in the DM. The draft is written when the business is built and the send path
+ * reads that same row back, which is what makes the message you approve the
+ * message that goes out.
+ */
+export async function draftFor(
+  runId: string,
+  username: string,
+): Promise<{ draft: Draft; model: string; business: BusinessRow } | null> {
+  const business = await businessFor(runId, username);
+  if (!business) return null;
+
+  const existing = await one<Draft>(
+    `SELECT * FROM prospect_drafts
+      WHERE lower(username) = lower($1) AND business_id = $2 AND status <> 'SENT'
+      ORDER BY created_at DESC LIMIT 1`,
+    [username.replace(/^@/, ''), business.id],
+  );
+  if (existing) return { draft: existing, model: 'reused-draft', business };
+
+  const written = await openerFor({
+    person: { username: business.prospect_username || username, bio: business.prospect_bio },
+    business: {
+      id: business.id,
+      name: business.name,
+      tagline: business.tagline,
+      priceCents: business.price_cents,
+    },
+  });
+  return { ...written, business };
+}
+
+/**
+ * Writes a fresh opener and puts it on the record before it is sent.
+ *
+ * Private on purpose: every caller wants `draftFor`, which reuses what is
+ * already drafted. Reaching past it asks the model again, and the message on
+ * screen stops being the message that goes out.
  *
  * The draft row is written first and only marked SENT once X has accepted the
  * message, so what the log says was sent is what actually left.
  */
-export async function openerFor(opts: {
+async function openerFor(opts: {
   person: Person;
   business: Product;
 }): Promise<{ draft: Draft; model: string }> {

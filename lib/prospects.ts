@@ -1,3 +1,4 @@
+import { env } from './env';
 import { id, query } from './db';
 import * as decisions from './decisions';
 import { brain, type ToolSpec } from './brain';
@@ -123,7 +124,9 @@ export async function draftForSegment(
       system: DRAFT_SYSTEM,
       prompt: [
         `Product: ${segment.proposed_offer}`,
-        `Price: $${(segment.price_cents / 100).toFixed(2)} one-time`,
+        // Recurring, because that is what checkout charges. An opener that
+        // calls it a one-off is a lie the reader discovers at Stripe.
+        `Price: $${(segment.price_cents / 100).toFixed(2)} per ${env.billingInterval}, recurring`,
         opts.productUrl ? `Link: ${opts.productUrl}` : '',
         `Segment: ${segment.label} — ${segment.description}`,
         '',

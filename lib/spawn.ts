@@ -24,6 +24,13 @@ export interface SpawnInput {
   cycleId?: string;
   /** Skip the model call and use this hypothesis verbatim. Used by tests. */
   hypothesis?: Hypothesis;
+  /**
+   * Who this one is for, when it is being built for a named person rather than
+   * a market. It reaches the page generator and nothing else: the storefront is
+   * written to one buyer, so it has to know which buyer. Unset on the segment
+   * path, where there is nobody to write to.
+   */
+  prospect?: { bio: string; chore: string };
 }
 
 export interface SpawnResult {
@@ -147,6 +154,8 @@ export async function spawn(input: SpawnInput): Promise<SpawnResult> {
     checkoutEndpoint: `${env.publicUrl}/api/checkout`,
     beaconEndpoint: `${env.publicUrl}/api/track`,
     disclosure: env.disclosureLine,
+    prospectBio: input.prospect?.bio,
+    prospectChore: input.prospect?.chore,
   };
 
   const pagegen = pagegenProvider();

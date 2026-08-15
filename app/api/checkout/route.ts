@@ -1,6 +1,7 @@
 import { checkoutProvider } from '@/lib/providers';
 import { env } from '@/lib/env';
 import * as businesses from '@/lib/businesses';
+import type { CheckoutRequest } from '@/lib/providers/types';
 import { errorMessage, json, preflight } from '@/lib/http';
 
 export const runtime = 'nodejs';
@@ -41,8 +42,11 @@ export async function POST(req: Request) {
       description: business.tagline || business.niche,
       amountCents: business.price_cents,
       currency: business.currency,
-      billing: (business.billing as 'one_time' | 'subscription') ?? 'one_time',
-      interval: (business.billing_interval as 'month') ?? 'month',
+      billing: business.billing,
+      // The column is free text; the union is what Stripe accepts. Only spawn
+      // writes it, and it writes env.billingInterval — the same value the
+      // storefront printed next to the price.
+      interval: business.billing_interval as CheckoutRequest['interval'],
       successUrl: `${env.publicUrl}/thanks?business=${businessId}&session={CHECKOUT_SESSION_ID}`,
       cancelUrl: business.url || env.publicUrl,
     });
