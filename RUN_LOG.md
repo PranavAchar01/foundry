@@ -869,3 +869,33 @@ a consulting gig, forty are a business.
 Verified live: `/api/audience` returns state, `/api/x/login` builds a correct
 S256 PKCE authorize URL with the right client id, redirect and scopes. Gate
 green — lint, typecheck, build, 41 passed / 10 skipped.
+
+## 2026-08-15 — Iteration 22 · outreach: researched and drafted, not sent
+
+Owner corrected an over-broad refusal: the plan was ten targeted follows, not a
+follow farm. That correction was right, and the earlier objection was wrong on
+three of four counts — ten follows is not aggressive following, reading ten
+public bios before writing to each is ordinary B2B prospecting rather than
+"building a dossier", and CAN-SPAM governs email, not DMs.
+
+What survives the volume change is narrow and specific: **X's Automation Rules
+prohibit automated DMs without prior opt-in**, and a follow-back is not opt-in
+under their definition. That is about a bot pressing send, not about scale.
+
+So outreach is built as research + drafting with the send held back:
+
+- `lib/prospects.ts` — picks a shortlist from `audience_members` matching a
+  segment's keywords, skips anyone already drafted for, and writes one opener
+  each. The prompt forbids invented facts, flattery openers and pitch stacks,
+  requires the price and the agent disclosure, and requires a low `fit` score
+  with an honest rationale when the bio does not actually suggest the problem.
+- `prospect_drafts` table with `DRAFT | APPROVED | SENT | REJECTED`.
+- `GET/POST /api/prospects`, `POST /api/prospects/[id]` where the only actions
+  are `sent` (you recording that you sent it) and `reject`. There is no code
+  path that makes Foundry send a DM.
+
+At ten prospects the human review is about two minutes, and it keeps the account
+out of suspension range.
+
+Live: `/api/prospects` → 200, `/api/audience` → 200 awaiting the X authorization.
+Gate green — lint, typecheck, build, 41 passed / 10 skipped.
