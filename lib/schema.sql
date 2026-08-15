@@ -295,6 +295,26 @@ CREATE TABLE IF NOT EXISTS labor_listings (
 
 CREATE INDEX IF NOT EXISTS labor_listings_segment_idx ON labor_listings (segment_id);
 
+-- Outreach openers, written by the agent and held for a human to send.
+-- Deliberately not a send queue: X prohibits unsolicited automated DMs, so
+-- `SENT` is only ever set by a person confirming they sent it.
+CREATE TABLE IF NOT EXISTS prospect_drafts (
+  id          TEXT PRIMARY KEY,
+  segment_id  TEXT REFERENCES audience_segments (id),
+  business_id TEXT,
+  username    TEXT        NOT NULL UNIQUE,
+  bio         TEXT        NOT NULL DEFAULT '',
+  message     TEXT        NOT NULL,
+  rationale   TEXT        NOT NULL DEFAULT '',
+  fit         REAL        NOT NULL DEFAULT 0,
+  status      TEXT        NOT NULL DEFAULT 'DRAFT'
+               CHECK (status IN ('DRAFT', 'APPROVED', 'SENT', 'REJECTED')),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  sent_at     TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS prospect_drafts_status_idx ON prospect_drafts (status);
+
 -- ---------------------------------------------------------------------------
 -- Forward migrations for databases created by an earlier revision.
 -- ---------------------------------------------------------------------------
