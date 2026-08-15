@@ -100,3 +100,79 @@ dashboard.
   credentials are additionally written under `FOUNDRY_VERCEL_*` aliases that
   `lib/env.ts` reads as a fallback. Generated a `CRON_SECRET` so
   `/api/cron/ceo` cannot be poked anonymously.
+
+## 2026-08-15 — Iteration 6 · target 10 (spawn timing), measured
+
+Ran a **real** spawn against the real Vercel API and the real model.
+`FOUNDRY_RUN_SPAWN=1 pnpm vitest run tests/spawn-timing.test.ts`:
+
+```
+  niche:    freelance illustrators quoting commissions
+  business: biz_mstxh0yqe49tru
+  url:      https://foundry-biz-commission-quote-kit.vercel.app
+  elapsed:  22.0s  (budget 240s)
+    hypothesis       15409ms  claude-opus-5
+    pagegen              1ms  internal
+    deploy            1218ms  vercel
+    persist            281ms
+    qa                1314ms  passed
+    qa PASS http-200 · contains:Commission Quote Kit · contains:<disclosure>
+    qa PASS checkout-button · browser:buy-visible   (real headless Chromium)
+  checkout: cs_live_a1GB58dlE318YopyJGY1H5PoAmhochnGFPZnZTeKmThRWyJv3Ub6peSEEk
+```
+
+**22.0 seconds**, against a 240-second budget. The page serves, carries the
+disclosure line, and a live Stripe session was created against it.
+
+## 2026-08-15 — Iteration 7 · target 1 blocked by Vercel, root-caused
+
+`vercel deploy --prod` put the deployment in `BLOCKED` with no message. Worked
+the cause rather than guessing at it:
+
+1. Deployed a static file to a **new** project → `READY` in 0s. So deployments
+   are not blocked wholesale — this is why spawned businesses work.
+2. Deployed the prebuilt Next.js app to a **new** project → clear error:
+   `VULNERABLE_NEXTJS_VERSION`. Upgraded Next 15.5.4 → **15.5.23**.
+3. Redeployed → `BLOCKED` again, still no message. Dumped the full deployment
+   record and found the real cause:
+
+   ```json
+   "seatBlock": { "blockCode": "TEAM_ACCESS_REQUIRED", "isVerified": false }
+   ```
+
+4. Checked team membership: `patelkula53-5172:OWNER:confirmed=true`. So it is
+   not membership — it is Vercel's account-level identity verification.
+
+**Conclusion:** deployments that contain serverless functions are refused until
+the Vercel account completes verification. Static deployments are unaffected,
+which is why every spawned business deploys fine. This is a dashboard action by
+the account owner; there is no code change that resolves it.
+
+## 2026-08-15 — Iteration 8 · targets 3, 9, 11 verified against the production build
+
+Vercel will not serve the app yet, so everything was verified against
+`pnpm build && pnpm start` — the identical production artefact.
+
+- `node scripts/smoke.mjs http://localhost:3111` — **21/21 checks pass**,
+  including a real `cs_live_…` checkout session against a real spawned business,
+  the unsigned-webhook rejection, CORS for spawned origins, and fetching the
+  deployed business page to assert the buy button and the disclosure line.
+- **One real CEO cycle**, HTTP 200 in 26.7s. Two steps, both from
+  `claude-opus-5`, both written to the append-only decision log:
+  - `HOLD` on the first business — *"18 minutes old with 0 pageviews… killing now
+    would be discarding an untested asset over a $1 sunk cost."*
+  - `SPAWN` of a second, deployed in **18.7s**, whose reasoning set its own legal
+    guardrail: *"no debt-collection law, no 'you're legally entitled to,' no
+    interest-rate advice."*
+- Dashboard confirmed rendering in a browser: portfolio cards with URL, revenue,
+  spend, CAC and status; running P&L with COGS broken out; live allocation log.
+- Portfolio after two cycles: 2 businesses, $2.00 of $150 spent, breaker armed.
+
+## 2026-08-15 — Iteration 9 · CI and the cron
+
+- `.github/workflows/ci.yml` — lint, typecheck, build, and tests on every push.
+- `.github/workflows/ceo-loop.yml` — drives `/api/cron/ceo` every 5 minutes.
+  Vercel Cron is capped at **daily** on Hobby (the API rejected `*/5 * * * *`
+  outright), so `vercel.json` keeps a daily native cron and this workflow
+  provides the 5-minute cadence today. On Pro, change one line in `vercel.json`.
+- Repository secrets set for both workflows.

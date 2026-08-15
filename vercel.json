@@ -3,7 +3,7 @@
   "crons": [
     {
       "path": "/api/cron/ceo",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 15 * * *"
     }
   ],
   "functions": {
