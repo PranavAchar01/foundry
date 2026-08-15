@@ -22,13 +22,13 @@
     "band:register": "node scripts/band-register.mjs"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.71.0",
+    "@anthropic-ai/sdk": "^0.116.0",
     "@superserve/sdk": "^0.8.2",
     "@vercel/sandbox": "^3.0.0",
     "next": "15.5.23",
     "pg": "^8.16.3",
-    "react": "19.1.1",
-    "react-dom": "19.1.1",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
     "stripe": "^18.5.0"
   },
   "devDependencies": {
