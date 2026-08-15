@@ -78,6 +78,24 @@ async function credentialsFor(actor: XActor): Promise<AppCredentials> {
     return { clientId: env.xClientId, clientSecret: env.xClientSecret };
   }
 
+  /*
+   * The owner's session is the exception, and has to be.
+   *
+   * They authorized before sessions existed, against the deployment's own X
+   * app, so there are no per-session credentials to find and their refresh
+   * token can only be redeemed by that app. Sending them through the visitor
+   * path would fail on the first refresh and sign out the one account this was
+   * all built to preserve.
+   */
+  const owner = await one<{ id: string }>(
+    `SELECT id FROM x_accounts WHERE session_id = $1 AND id = 'x_primary'`,
+    [actor.sessionId],
+  );
+  if (owner) {
+    if (!env.xClientId) throw new Error('X_CLIENT_ID is not set');
+    return { clientId: env.xClientId, clientSecret: env.xClientSecret };
+  }
+
   const row = await one<{ client_id: string; client_secret: string }>(
     `SELECT client_id, client_secret FROM x_sessions WHERE id = $1`,
     [actor.sessionId],

@@ -38,6 +38,15 @@ const KEYS = [
   'STRIPE_ACCOUNT_ID',
   'STRIPE_PAYMENT_METHOD_TYPES',
   'FOUNDRY_PUBLIC_URL',
+  // Binds the deployment's X account to one browser session. Without it in
+  // production the owner cannot claim their own account back.
+  'FOUNDRY_OWNER_KEY',
+  // Product shape. These match the code defaults today, so leaving them behind
+  // changed nothing — but it meant editing them locally would have had no
+  // effect in production, which is a worse bug to find later.
+  'FOUNDRY_MAX_PRICE_CENTS',
+  'FOUNDRY_SUBSCRIBER_TARGET',
+  'FOUNDRY_BILLING_INTERVAL',
   'GITHUB_REPO',
   'TERAC_API_KEY',
   'TERAC_API_BASE',
@@ -140,6 +149,28 @@ for (const [key, value] of entries) {
     failed++;
     console.log(bad('FAIL') + `  ${key}: ${res.error}`);
   }
+}
+
+/*
+ * Anything set locally that this script does not know about.
+ *
+ * KEYS is an allowlist, so a variable added to .env.local and not added here is
+ * silently never deployed — the code reads it as unset in production and fails
+ * in a way that looks like a logic bug rather than a missing push. Naming them
+ * is the difference between a five-second fix and an hour.
+ */
+const known = new Set([...KEYS, ...Object.keys(ALIASED), ...Object.values(ALIASED), 'CRON_SECRET']);
+const unknown = Object.keys(process.env)
+  .filter((k) => /^(FOUNDRY|STRIPE|X|TERAC|LINQ|BAND|REPLAY|LOVABLE|SUPERSERVE|RESEND|POSTGRES|OPENAI|ANTHROPIC|GITHUB|VERCEL)_/.test(k))
+  .filter((k) => !known.has(k) && process.env[k]);
+
+if (unknown.length) {
+  console.log(
+    warn('\nNOTE') +
+      `  ${unknown.length} local variable(s) are not in this script's list and were NOT pushed:`,
+  );
+  for (const k of unknown) console.log(dim(`      ${k}`));
+  console.log(dim('      Add them to KEYS if production needs them.'));
 }
 
 // A cron secret the project generates for itself, so /api/cron/ceo cannot be
