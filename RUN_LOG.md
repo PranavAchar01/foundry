@@ -262,3 +262,35 @@ repository owner (`achar.pranav@gmail.com` / `PranavAchar01`).
 So the account that must clear `limited` is `patelkula53@gmail.com`, signed in
 via GitHub `Kula6475`. Verifying any other Vercel account has no effect on it.
 Three attempts, three identical blocks; no further retry is informative.
+
+## 2026-08-15 — Iteration 13 · Option B chosen: make the toolchain account-portable
+
+Owner chose to ship on an account they control. Checked for a usable credential
+first: the Vercel MCP connection reports **no teams**, and the local CLI
+credential at `~/.local/share/com.vercel.cli/auth.json` is expired
+(`vercel whoami` → `Not authorized`). The `VERCEL_TOKEN` in `.env.local` is
+scoped to `team_dK8pShHDulInCH3EeV2CRz9k` only. So a new token is required and
+cannot be manufactured here.
+
+Used the time to remove every obstacle in front of that token. Previously the
+toolchain assumed `VERCEL_PROJECT_ID` already existed and that the public URL
+never changed — neither holds when moving accounts. Added:
+
+- `scripts/_vercel.mjs` — discovers the team from the token, finds or **creates**
+  the project by name, writes `.vercel/project.json`, and persists the resolved
+  ids back to `.env.local`. `deploy` and `env:push` both route through it, so
+  they can never disagree about where they are writing.
+- `scripts/retarget.mjs` — repoints the three things pinned to the origin when
+  it changes: `FOUNDRY_PUBLIC_URL` (baked into every spawned page's checkout and
+  beacon calls), the **Stripe webhook endpoint** (signing secret is preserved,
+  so `STRIPE_WEBHOOK_SECRET` stays valid), and the GitHub Actions variable the
+  5-minute CEO loop posts to.
+- `deploy-vercel.mjs` now reports the canonical alias on success and, when it
+  differs from `FOUNDRY_PUBLIC_URL`, prints the exact retarget command.
+
+Verified against the current account: `pnpm env:push` re-resolved the existing
+project and pushed 35 vars; `retarget` correctly detected the URL was already
+correct and changed nothing. Gate still green — lint, typecheck, build clean,
+30 passed / 1 skipped.
+
+A fresh token is now the only remaining input.

@@ -9,17 +9,19 @@
  * four are additionally written under a FOUNDRY_ alias that lib/env.ts reads.
  */
 import { bad, dim, loadEnv, ok, warn } from './_env.mjs';
+import { resolveTarget } from './_vercel.mjs';
 
 loadEnv();
 
 const TOKEN = process.env.VERCEL_TOKEN;
-const TEAM = process.env.VERCEL_TEAM_ID;
-const PROJECT = process.env.VERCEL_PROJECT_ID;
 
-if (!TOKEN || !PROJECT) {
-  console.error(bad('FAIL') + '  VERCEL_TOKEN and VERCEL_PROJECT_ID are required');
+if (!TOKEN) {
+  console.error(bad('FAIL') + '  VERCEL_TOKEN is required');
   process.exit(1);
 }
+
+// Same resolution the deploy uses, so both agree on where they are writing.
+const { teamId: TEAM, projectId: PROJECT } = await resolveTarget();
 
 /** Everything production needs. Anything not listed here stays local. */
 const KEYS = [
