@@ -205,6 +205,10 @@ CREATE INDEX IF NOT EXISTS machine_runs_business_idx ON machine_runs (business_i
 -- ---------------------------------------------------------------------------
 
 ALTER TABLE businesses     ADD COLUMN IF NOT EXISTS is_fixture BOOLEAN NOT NULL DEFAULT false;
+-- Retired at an operator reset. Hidden from the portfolio, but its ledger and
+-- decision history stay — those tables are append-only and a reset must not be
+-- able to rewrite what was actually spent.
+ALTER TABLE businesses     ADD COLUMN IF NOT EXISTS archived  BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE businesses     ADD COLUMN IF NOT EXISTS tagline    TEXT    NOT NULL DEFAULT '';
 ALTER TABLE ledger_entries ADD COLUMN IF NOT EXISTS source     TEXT    NOT NULL DEFAULT 'foundry';
 ALTER TABLE escalations    ADD COLUMN IF NOT EXISTS answer     TEXT;

@@ -8,5 +8,5 @@ export const revalidate = 0;
  * instantly and never fails a build on a cold database.
  */
 export default function Home() {
-  return <Dashboard initial={null} />;
+  return <Dashboard />;
 }
