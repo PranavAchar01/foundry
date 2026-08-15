@@ -414,3 +414,80 @@ thread's file, not touched here).
 **Not verified:** the MCP transport itself. `LOVABLE_API_KEY` is empty, so the
 provider cannot run unattended yet — the tool contract is verified, the endpoint
 and key are configuration.
+
+## 2026-08-15 — Iteration 15 · three sponsor keys, real APIs, and a machine per business
+
+Owner supplied Superserve, Replay and Band keys, and asked that every spawned
+company run on its own virtual machine.
+
+**Every sponsor implementation written before this point was wrong.** They were
+authored blind against guessed endpoints. Probed all three before flipping any
+flag; the failures were the useful part:
+
+- `api.superserve.ai` returned Go-style 404s — a live API, wrong paths. Real
+  answer: an official SDK, `@superserve/sdk`.
+- `api.replay.io/v1/*` returned **401, not 404** — the host was right and the
+  auth was wrong. Real answer: Replay **QA** at `https://qa.replay.io/api/v1`,
+  bearer auth, full OpenAPI at `/openapi.json`. The `lqa_` key prefix is
+  literally "loop-qa".
+- `api.band.ai` did not resolve at all. Real answer: `https://app.band.ai/api/v1`
+  with **`X-API-Key`**, not a bearer token.
+
+Two things then had to be discovered rather than assumed:
+
+1. Band's **Human API is Enterprise-gated** (`403 plan_required`). The Agent API
+   is not. So `pnpm band:register` mints an agent identity from the human key —
+   handle `achar.pranav/foundry-ceo` — and the bus authenticates as that agent.
+2. Superserve's shape: `commands.run`, `files.write(path, content)` one file at
+   a time, `pause/resume/kill`, preview ports. A sandbox came up in **0.3s**.
+
+### The machine layer
+
+`machines` and `machine_runs` tables, `lib/machine.ts`, `lib/operator.ts`.
+Every spawned business now gets a persistent Ubuntu 24.04 microVM seeded with
+its own `COMPANY.md`, `company.json` and `NOTES.md`. The operator agent works
+that machine with a real shell; `machine_runs` is append-only, so the record of
+what it did cannot be rewritten. Compute is metered as OPEX per second, idle
+machines are paused, and killing a business kills its machine.
+
+`FOUNDRY_RUN_MACHINE=1 pnpm vitest run tests/machine.test.ts` — **7/7**:
+provision + seed, real Linux, state persisting across separate connections,
+append-only transcript enforced, a real operator session, metering, clean kill.
+
+### A bug the tests caught
+
+`spawn()` checked the max-business ceiling before the circuit breaker, so a
+tripped breaker was reported as `MAX_BUSINESSES`. The emergency stop now
+short-circuits every other check. Fixed in code, not in the test.
+
+## 2026-08-15 — Iteration 16 · the brain became swappable
+
+Mid-iteration the **Anthropic credit balance ran out** (`400 invalid_request_error`,
+"credit balance is too low"). The portfolio kept running — that is what the
+heuristic fallback is for — but every hypothesis and judgement would have been
+tagged `heuristic-fallback` instead of real reasoning.
+
+Rather than swap one vendor for another, made the brain the **ninth swappable
+capability**: `FOUNDRY_BRAIN_PROVIDER=anthropic|openai`, `lib/brain.ts`, with a
+provider-neutral transcript type that each brain translates to its own wire
+format. `agent.ts` and `operator.ts` no longer import a vendor SDK.
+
+Details that mattered:
+- OpenAI strict function schemas need `additionalProperties: false` and every
+  property in `required`; the schema is normalised automatically.
+- Reasoning models spend tokens *before* the tool call — `gpt-5` returned 200
+  with no tool call at a 400-token budget. Floor raised to 3000.
+- `gpt-5.6-sol` rejects function tools with reasoning_effort in chat
+  completions. Probed the whole ladder; **`gpt-5.5` does forced tool calls
+  cleanly in 4.4s** and is now `FOUNDRY_OPENAI_MODEL`.
+- `callTool` tries the *other* configured brain before the heuristic, so a
+  vendor's billing can never again stop the portfolio on its own.
+
+Re-ran the machine suite on the OpenAI brain — **7/7**, model
+`gpt-5.5-2026-04-23`, 5 real commands. The operator read its brief, explored the
+filesystem, built a product directory and wrote `scripts/check_disclosure.sh`
+that verifies the disclosure line on public artefacts — and it passed.
+
+Gate: lint clean, typecheck clean, build clean, **41 passed / 8 skipped**.
+Deployed; `pnpm smoke` **21/21** against the live URL, now reporting
+`brain=openai … sandbox=superserve bus=band qa=replay`.
