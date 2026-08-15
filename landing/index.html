@@ -9,20 +9,26 @@
 <meta property="og:description" content="It spawns businesses, funds them, reads the P&L, and kills the losers. No human in the loop.">
 <meta property="og:type" content="website">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏭</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hedvig+Letters+Serif:opsz@12..24&family=Inter:wght@300..700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#08090b; --panel:#0e1014; --panel-2:#121519; --line:#1e2228;
-    --fg:#e8eaed; --muted:#8b929c; --dim:#5c636d;
-    --acc:#4ade80; --acc-dim:#166534; --red:#f87171; --amber:#fbbf24;
+    --bg:#241540; --panel:#2e1d4f; --panel-2:#291947; --line:rgba(247,227,211,.14);
+    --fg:#f7e3d3; --muted:#c3b0dd; --dim:#9680bb;
+    --acc:#ff5fa2; --acc-dim:#3d2a5c; --red:#c3b0dd; --amber:#9680bb;
     --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
-    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Helvetica,Arial,sans-serif;
+    --sans:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+    --serif:'Hedvig Letters Serif',Georgia,serif;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html{scroll-behavior:smooth}
   body{background:var(--bg);color:var(--fg);font-family:var(--sans);line-height:1.55;
     -webkit-font-smoothing:antialiased;overflow-x:hidden}
   body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
-    background:radial-gradient(900px 500px at 50% -10%,rgba(74,222,128,.07),transparent 70%)}
+    background:radial-gradient(900px 500px at 50% -10%,rgba(255,95,162,.08),transparent 70%)}
+  body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:99;opacity:.28;
+    background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScyMDAnIGhlaWdodD0nMjAwJz48ZmlsdGVyIGlkPSduJz48ZmVUdXJidWxlbmNlIHR5cGU9J2ZyYWN0YWxOb2lzZScgYmFzZUZyZXF1ZW5jeT0nMC44JyBudW1PY3RhdmVzPSczJy8+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9JzIwMCcgaGVpZ2h0PScyMDAnIGZpbHRlcj0ndXJsKCNuKScgb3BhY2l0eT0nMC4zNScvPjwvc3ZnPg==")}
   .wrap{max-width:1080px;margin:0 auto;padding:0 24px;position:relative;z-index:1}
 
   /* nav */
@@ -36,11 +42,14 @@
   .navmeta{font-family:var(--mono);font-size:12px;color:var(--dim)}
 
   /* hero */
-  header{padding:88px 0 72px}
+  header{padding:110px 0 90px;position:relative}
+  header::before{content:"";position:absolute;inset:-160px -50vw 0;pointer-events:none;z-index:-1;
+    background:linear-gradient(180deg,rgba(36,21,64,.30),rgba(36,21,64,.84) 62%,#241540 96%),
+    url("hero-foundry.png") center 32%/cover no-repeat}
   .tag{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;
     letter-spacing:.1em;text-transform:uppercase;color:var(--acc);border:1px solid var(--acc-dim);
-    background:rgba(74,222,128,.06);padding:6px 12px;border-radius:100px;margin-bottom:28px}
-  h1{font-size:clamp(38px,6.4vw,72px);line-height:1.02;letter-spacing:-.035em;font-weight:600;
+    background:rgba(255,95,162,.08);padding:6px 12px;border-radius:100px;margin-bottom:28px}
+  h1{font-family:var(--serif);font-size:clamp(40px,6.6vw,76px);line-height:1.04;letter-spacing:-.02em;font-weight:400;
     max-width:15ch}
   h1 em{font-style:normal;color:var(--dim)}
   .sub{margin-top:26px;font-size:clamp(17px,2.1vw,21px);color:var(--muted);max-width:56ch;
@@ -51,8 +60,8 @@
     padding:13px 22px;border-radius:8px;border:1px solid var(--line);color:var(--fg);
     transition:.18s;display:inline-block}
   .btn:hover{border-color:var(--dim);transform:translateY(-1px)}
-  .btn.p{background:var(--acc);color:#04120a;border-color:var(--acc);font-weight:600}
-  .btn.p:hover{background:#6ee79b;box-shadow:0 6px 24px rgba(74,222,128,.22)}
+  .btn.p{background:var(--acc);color:#2b0a1c;border-color:var(--acc);font-weight:600}
+  .btn.p:hover{background:#ff7ab2;box-shadow:0 6px 24px rgba(255,95,162,.25)}
 
   /* thesis strip */
   .thesis{border-top:1px solid var(--line);border-bottom:1px solid var(--line);
@@ -66,7 +75,7 @@
   section{padding:76px 0}
   .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;
     color:var(--dim);margin-bottom:18px}
-  h2{font-size:clamp(25px,3.4vw,34px);letter-spacing:-.028em;font-weight:600;margin-bottom:14px}
+  h2{font-family:var(--serif);font-size:clamp(26px,3.5vw,36px);letter-spacing:-.02em;font-weight:400;margin-bottom:14px}
   .lede{color:var(--muted);max-width:60ch;font-size:16.5px}
 
   /* portfolio */
@@ -79,7 +88,7 @@
   .cname{font-family:var(--mono);font-size:12.5px;color:var(--muted);letter-spacing:.04em}
   .status{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;padding:3.5px 8px;
     border-radius:4px;text-transform:uppercase;white-space:nowrap}
-  .s-scale{background:rgba(74,222,128,.12);color:var(--acc);border:1px solid var(--acc-dim)}
+  .s-scale{background:rgba(255,95,162,.12);color:var(--acc);border:1px solid var(--acc-dim)}
   .s-test{background:rgba(251,191,36,.1);color:var(--amber);border:1px solid #78350f}
   .s-kill{background:rgba(248,113,113,.09);color:var(--red);border:1px solid #7f1d1d}
   .cdesc{font-size:14.5px;color:var(--fg);margin-bottom:18px;min-height:42px;line-height:1.45}
@@ -121,7 +130,7 @@
   .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:28px}
   .chip{font-family:var(--mono);font-size:11.5px;color:var(--muted);border:1px solid var(--line);
     padding:7px 13px;border-radius:6px;background:var(--panel)}
-  .chip.host{color:var(--acc);border-color:var(--acc-dim);background:rgba(74,222,128,.06)}
+  .chip.host{color:var(--acc);border-color:var(--acc-dim);background:rgba(255,95,162,.08)}
 
   footer{border-top:1px solid var(--line);padding:40px 0 64px;margin-top:40px}
   .frow{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;
