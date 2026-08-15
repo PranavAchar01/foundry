@@ -20,8 +20,22 @@ const API = 'https://api.x.com';
 const AUTHORIZE = 'https://x.com/i/oauth2/authorize';
 const TOKEN = 'https://api.x.com/2/oauth2/token';
 
-/** Least privilege: read the audience, nothing else. `offline.access` buys refresh. */
-export const SCOPES = ['users.read', 'follows.read', 'tweet.read', 'offline.access'];
+/**
+ * Read the audience, plus the two writes the consented demo cohort needs.
+ *
+ * `follows.write` and `dm.write` are only ever exercised against accounts that
+ * appear in `consent_cohort` — see lib/cohort.ts. Adding a scope does not widen
+ * who can be contacted; the cohort table does that, and only you can write to it.
+ */
+export const SCOPES = [
+  'users.read',
+  'follows.read',
+  'follows.write',
+  'tweet.read',
+  'dm.read',
+  'dm.write',
+  'offline.access',
+];
 
 export interface XAccount {
   id: string;
@@ -251,6 +265,67 @@ export async function storeProfiles(profiles: XProfile[]): Promise<number> {
     stored++;
   }
   return stored;
+}
+
+// ---------------------------------------------------------------------------
+// Writes. Every one of these is gated on recorded consent by its caller.
+// ---------------------------------------------------------------------------
+
+/** Resolves a handle to its numeric id. */
+export async function lookupByUsername(username: string): Promise<XProfile | null> {
+  const token = await accessToken();
+  const handle = username.replace(/^@/, '');
+  const res = await fetch(
+    `${API}/2/users/by/username/${encodeURIComponent(handle)}?user.fields=description,public_metrics`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  const json = (await res.json().catch(() => ({}))) as {
+    data?: { id: string; username: string; name: string; description?: string; public_metrics?: { followers_count?: number } };
+  };
+  if (!res.ok || !json.data) return null;
+  return {
+    id: json.data.id,
+    username: json.data.username,
+    name: json.data.name,
+    description: json.data.description ?? '',
+    followers: json.data.public_metrics?.followers_count ?? 0,
+  };
+}
+
+export async function follow(targetUserId: string): Promise<{ ok: boolean; error: string | null }> {
+  const acct = await account();
+  if (!acct) return { ok: false, error: 'no X account connected' };
+  const token = await accessToken();
+  const res = await fetch(`${API}/2/users/${acct.x_user_id}/following`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ target_user_id: targetUserId }),
+  });
+  const json = (await res.json().catch(() => ({}))) as { detail?: string; title?: string };
+  return res.ok
+    ? { ok: true, error: null }
+    : { ok: false, error: `${res.status} ${json.title ?? ''} ${json.detail ?? ''}`.trim() };
+}
+
+/** Sends a DM. Callers must have verified consent first. */
+export async function sendDm(
+  targetUserId: string,
+  text: string,
+): Promise<{ ok: boolean; id: string | null; error: string | null }> {
+  const token = await accessToken();
+  const res = await fetch(`${API}/2/dm_conversations/with/${targetUserId}/messages`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ text: text.slice(0, 10000) }),
+  });
+  const json = (await res.json().catch(() => ({}))) as {
+    data?: { dm_event_id?: string };
+    detail?: string;
+    title?: string;
+  };
+  return res.ok
+    ? { ok: true, id: json.data?.dm_event_id ?? null, error: null }
+    : { ok: false, id: null, error: `${res.status} ${json.title ?? ''} ${json.detail ?? ''}`.trim() };
 }
 
 export async function audienceSize(): Promise<number> {

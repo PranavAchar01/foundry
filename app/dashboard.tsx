@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import CompanyDetail from './detail';
+import ClientRun from './client-run';
 
 /**
  * One page. Every company is a tile showing its actual hero page, live.
@@ -214,6 +215,8 @@ export default function Dashboard() {
           <span className="ml-3 text-sm text-[#0b0614]/80">{budget.breaker.reason}</span>
         </div>
       )}
+
+      <ClientRun />
 
       {/* ---- the wall of companies ---- */}
       {data.businesses.length === 0 ? (

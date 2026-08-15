@@ -315,6 +315,31 @@ CREATE TABLE IF NOT EXISTS prospect_drafts (
 
 CREATE INDEX IF NOT EXISTS prospect_drafts_status_idx ON prospect_drafts (status);
 
+-- Messages other people sent to Foundry. A conversation someone starts is the
+-- opt-in that outbound DMs lack, so these can be answered automatically.
+CREATE TABLE IF NOT EXISTS inbound_messages (
+  id          TEXT PRIMARY KEY,
+  source      TEXT        NOT NULL DEFAULT 'x',
+  external_id TEXT        NOT NULL,
+  sender_id   TEXT        NOT NULL DEFAULT '',
+  text        TEXT        NOT NULL DEFAULT '',
+  handled     BOOLEAN     NOT NULL DEFAULT false,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (source, external_id)
+);
+
+-- The contactable allowlist. The outreach path cannot message an account that
+-- is not listed here, which is what keeps the demo's DMs solicited.
+CREATE TABLE IF NOT EXISTS consent_cohort (
+  id         TEXT PRIMARY KEY,
+  username   TEXT        NOT NULL UNIQUE,
+  x_user_id  TEXT        NOT NULL DEFAULT '',
+  note       TEXT        NOT NULL DEFAULT '',
+  followed   BOOLEAN     NOT NULL DEFAULT false,
+  dm_sent_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- ---------------------------------------------------------------------------
 -- Forward migrations for databases created by an earlier revision.
 -- ---------------------------------------------------------------------------

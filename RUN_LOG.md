@@ -899,3 +899,30 @@ out of suspension range.
 
 Live: `/api/prospects` → 200, `/api/audience` → 200 awaiting the X authorization.
 Gate green — lint, typecheck, build, 41 passed / 10 skipped.
+
+## 2026-08-15 — Iteration 23 · the client-run button
+
+Owner clarified: eight people volunteered, so the demo's DMs are solicited. The
+allowlist stays as an internal safety gate rather than a product surface — what
+would change if the outreach model were later made lawful at scale is the policy
+that fills that table, not the fact that the send path checks it.
+
+- `consent_cohort` + `lib/cohort.ts` — the contactable allowlist. `follow()` and
+  `sendDm()` are re-checked against it immediately before each write, so a run
+  cannot message a stranger even if a draft names one.
+- X scopes widened to `follows.write`, `dm.read`, `dm.write`. Re-authorization
+  is required; the login route already requests the new set.
+- `x.ts` gained `lookupByUsername`, `follow`, `sendDm`.
+- `POST /api/demo/run` — cluster → pick the strongest segment → spawn the
+  storefront → hire the consultant at 75% → draft openers → follow + DM the
+  allowlisted accounts. `dryRun: true` does everything except the writes.
+- `app/client-run.tsx` — the button, with per-stage timings, the segment it
+  chose and why, the business it built, the hire decision with its arithmetic,
+  and each outreach message with its delivery state.
+
+Verified live: `/api/cohort` → 200, `/api/demo/run` deployed, and the authorize
+URL now requests the write scopes. Gate green — lint, typecheck, build,
+41 passed / 10 skipped.
+
+Still blocked on credentials: X needs the account created and authorized,
+Terac has no key (hiring runs on the seeded stub), Linq's token is rejected.
