@@ -198,3 +198,37 @@ Vercel will not serve the app yet, so everything was verified against
 **State at hand-off:** 10 of 11 targets verified end to end. Target 1 is
 complete in code and blocked at the last inch by Vercel account verification —
 diagnosed to the exact `blockCode`, not guessed at.
+
+## 2026-08-15 — Iteration 11 · `pnpm go-live` after the owner reported verifying
+
+Ran the full pipeline. Three of five stages passed; it stopped where expected.
+
+```
+▸ preflight   PASS   (anthropic, stripe both ways, webhook, vercel, postgres)
+▸ migrate     PASS   (9 tables, append-only DELETE rejected)
+▸ env push    PASS   (36 vars upserted into foundry-biz)
+▸ deploy      FAIL   dpl_6SDcmpYgGBd9AM3YJC3ydJ6DPAij -> BLOCKED
+                     seatBlock.blockCode = TEAM_ACCESS_REQUIRED, isVerified = false
+▸ smoke       not reached
+```
+
+`user.limited` is **still `true`**. So whatever verification was completed did not
+clear the flag on the account this deploy runs as. Checked further rather than
+retrying blindly:
+
+- Tried Vercel's redeploy endpoint to re-evaluate the seat block without a fresh
+  upload → `deployment_can_never_deploy` (a BLOCKED deployment cannot be reused).
+- Tried the Git integration as an alternative deploy path, where the deployment
+  is attributed to the Vercel GitHub App rather than to the token's user →
+  `repo_not_found`; the Vercel GitHub App is not installed on the repository.
+- Enumerated the token's identity and reach:
+
+  ```
+  token belongs to : patelkula53-5172  <patelkula53@gmail.com>   limited = true
+  teams visible    : foodbank (hobby)  team_dK8pShHDulInCH3EeV2CRz9k
+  ```
+
+**The likely cause:** the Vercel account holding `VERCEL_TOKEN` is
+`patelkula53@gmail.com`, which is not the repository owner's address
+(`achar.pranav@gmail.com`). Verifying a different Vercel account does not clear
+`limited` on this one. Nothing in this repository can resolve it.
