@@ -11,18 +11,21 @@
  */
 import { spawn } from 'node:child_process';
 import { bad, dim, loadEnv, ok, warn } from './_env.mjs';
+import { resolveTarget } from './_vercel.mjs';
 
 loadEnv();
 
 const TOKEN = process.env.VERCEL_TOKEN;
-const TEAM = process.env.VERCEL_TEAM_ID;
-const PROJECT = process.env.VERCEL_PROJECT_ID;
 const PREBUILT = process.argv.includes('--prebuilt');
 
-if (!TOKEN || !PROJECT) {
-  console.error(bad('FAIL') + '  VERCEL_TOKEN and VERCEL_PROJECT_ID are required');
+if (!TOKEN) {
+  console.error(bad('FAIL') + '  VERCEL_TOKEN is required');
   process.exit(1);
 }
+
+// Discovers the team, creates the project if it does not exist, and writes
+// .vercel/project.json — so a bare token is enough to ship to a fresh account.
+const { teamId: TEAM, projectId: PROJECT, projectName: PROJECT_NAME } = await resolveTarget();
 
 const api = async (path) => {
   const res = await fetch(
@@ -128,6 +131,27 @@ if (state === 'READY') {
   console.log('');
   console.log(ok('PASS') + `  deployment READY in ${Math.round((Date.now() - started) / 1000)}s`);
   for (const a of aliases) console.log(dim(`       https://${a}`));
+
+  // The stable project alias is the app's real origin.
+  const canonical =
+    aliases.find((a) => a === `${PROJECT_NAME}.vercel.app`) ??
+    aliases.slice().sort((a, b) => a.length - b.length)[0];
+
+  if (canonical && `https://${canonical}` !== process.env.FOUNDRY_PUBLIC_URL) {
+    console.log('');
+    console.log(
+      warn('NOTE') +
+        `  this deployment serves https://${canonical}, but FOUNDRY_PUBLIC_URL is` +
+        ` ${process.env.FOUNDRY_PUBLIC_URL}.`,
+    );
+    console.log(
+      dim(
+        '       Spawned pages bake that value into their checkout and beacon calls, and\n' +
+          '       the Stripe webhook points at it. Repoint everything with:\n' +
+          `         node scripts/retarget.mjs https://${canonical} && pnpm env:push && pnpm deploy`,
+      ),
+    );
+  }
   process.exit(0);
 }
 
