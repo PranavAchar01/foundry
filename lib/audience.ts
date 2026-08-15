@@ -148,6 +148,65 @@ export interface ClusterResult {
   decisionId: string;
 }
 
+/**
+ * Write down who actually landed in each segment.
+ *
+ * The clustering model is shown bios with the handles stripped, so it returns
+ * segments in aggregate and never says who went where — and its own memberCount
+ * is an estimate it was asked to guess. Re-matching every stored bio against the
+ * keywords it keyed on turns membership into something the database can answer,
+ * and makes member_count a count rather than a claim.
+ *
+ * Members matching nothing are left unassigned rather than forced into the
+ * nearest segment: "no segment fits this person" is a real answer.
+ */
+export async function assign(segments: Segment[]): Promise<{ assigned: number; scanned: number }> {
+  if (!segments.length) return { assigned: 0, scanned: 0 };
+
+  const members = await query<{ id: string; bio: string }>(
+    `SELECT id, bio FROM audience_members WHERE bio <> ''`,
+  );
+  const prepared = segments.map((s) => ({
+    id: s.id,
+    terms: (s.keywords ?? []).map((k) => k.toLowerCase().trim()).filter((k) => k.length > 2),
+  }));
+
+  const ids: string[] = [];
+  const segs: string[] = [];
+  let assigned = 0;
+
+  for (const m of members) {
+    const bio = m.bio.toLowerCase();
+    let best: { id: string; score: number } | null = null;
+    for (const s of prepared) {
+      let score = 0;
+      for (const t of s.terms) if (bio.includes(t)) score++;
+      if (score > 0 && (!best || score > best.score)) best = { id: s.id, score };
+    }
+    ids.push(m.id);
+    // Empty means unassigned — the same pass clears memberships left behind by
+    // an earlier clustering run, so no member points at a stale segment.
+    segs.push(best?.id ?? '');
+    if (best) assigned++;
+  }
+
+  if (ids.length) {
+    await query(
+      `UPDATE audience_members m SET segment_id = NULLIF(v.seg, '')
+         FROM (SELECT unnest($1::text[]) AS mid, unnest($2::text[]) AS seg) v
+        WHERE m.id = v.mid`,
+      [ids, segs],
+    );
+  }
+
+  await query(
+    `UPDATE audience_segments s
+        SET member_count = (SELECT count(*) FROM audience_members m WHERE m.segment_id = s.id)`,
+  );
+
+  return { assigned, scanned: members.length };
+}
+
 export async function cluster(sampleSize = 300): Promise<ClusterResult> {
   const members = await query<{ username: string; bio: string; followers: number }>(
     `SELECT username, bio, followers FROM audience_members
@@ -207,20 +266,34 @@ export async function cluster(sampleSize = 300): Promise<ClusterResult> {
     saved.push(rows[0]);
   }
 
+  const membership = await assign(saved);
+  const withCounts = saved.length
+    ? await query<Segment>(
+        `SELECT * FROM audience_segments WHERE id = ANY($1::text[]) ORDER BY member_count DESC`,
+        [saved.map((s) => s.id)],
+      )
+    : [];
+
   const row = await decisions.record({
     cycleId,
     action: 'AUDIENCE_CLUSTERED',
     reasoning:
       `Grouped ${members.length} sampled bios into ${saved.length} segment(s): ` +
-      saved.map((s) => `${s.label} (${s.member_count}, willingness ${s.willingness.toFixed(2)})`).join('; ') +
-      '. Segments are markets, not individuals — no account was profiled or targeted.',
+      withCounts.map((s) => `${s.label} (${s.member_count}, willingness ${s.willingness.toFixed(2)})`).join('; ') +
+      `. ${membership.assigned} of ${membership.scanned} stored bios matched a segment's keywords; ` +
+      'the rest were left unassigned. Segments are markets, not individuals — no account was ' +
+      'profiled or targeted.',
     confidence: 0.7,
     model,
     inputs: { sampled: members.length },
-    outputs: { segments: saved.map((s) => ({ id: s.id, label: s.label, willingness: s.willingness })), modelSourced: fromModel },
+    outputs: {
+      segments: withCounts.map((s) => ({ id: s.id, label: s.label, willingness: s.willingness, members: s.member_count })),
+      modelSourced: fromModel,
+      membership,
+    },
   });
 
-  return { segments: saved, sampled: members.length, model, fromModel, decisionId: row.id };
+  return { segments: withCounts, sampled: members.length, model, fromModel, decisionId: row.id };
 }
 
 interface RawSegment {

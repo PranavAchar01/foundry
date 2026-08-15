@@ -45,8 +45,10 @@ const DRAFT_TOOL: ToolSpec = {
             message: {
               type: 'string',
               description:
-                'The DM. Under 400 characters. Specific to what their bio says they do. ' +
-                'No flattery, no "I came across your profile", no fake familiarity.',
+                'The opening DM. HARD LIMIT 220 characters — this is a first message to a ' +
+                'stranger, so it earns a reply or it gets ignored. One sentence on what it is, ' +
+                'tied to what their bio says they do, and the price. No flattery, no "I came ' +
+                'across your profile", no pitch stack, no bullet lists.',
             },
             rationale: {
               type: 'string',
@@ -69,11 +71,11 @@ You are writing to someone whose public bio suggests they have the problem a pro
 Write like a person who built something relevant, not like a sales sequence.
 
 Rules:
-- Under 400 characters. One idea. No pitch stack.
+- HARD LIMIT 220 characters. One idea. A first DM that scrolls is a first DM that is ignored.
 - Reference what they actually do, from their bio, in concrete terms. Never invent facts about
   them, their company, their funding, or their traffic.
 - No flattery openers. No "I noticed", "I came across", "Hope this finds you well".
-- Say what the thing is and what it costs. A link is enough of a call to action.
+- Say what it is and what it costs per month. Do not paste the link in the opener — offer it.
 - Disclose that FOUNDRY is agent-operated. Do not hide it.
 - If the person's bio does not actually suggest the problem, set fit low and say so in the
   rationale rather than writing a message that pretends otherwise.`;
@@ -157,7 +159,7 @@ export async function draftForSegment(
         opts.businessId ?? segment.business_id,
         match.username,
         match.bio.slice(0, 300),
-        String(d.message ?? '').slice(0, 900),
+        String(d.message ?? '').slice(0, 260),
         String(d.rationale ?? '').slice(0, 400),
         Math.min(1, Math.max(0, Number(d.fit ?? 0))),
       ],

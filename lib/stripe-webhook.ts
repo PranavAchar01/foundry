@@ -59,6 +59,10 @@ export async function handle(event: Stripe.Event): Promise<WebhookOutcome> {
 
       if (created && businessId) {
         await businesses.recordConversion(businessId);
+        // Money arriving is what closes a deal — the sales agent can talk a
+        // conversation to CLOSING but never declares it won itself.
+        const { markWon } = await import('./conversation');
+        await markWon(businessId, `paid $${(amount / 100).toFixed(2)} via ${session.id}`).catch(() => null);
         await decisions.record({
           cycleId: `webhook_${event.id}`,
           businessId,

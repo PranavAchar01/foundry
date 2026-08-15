@@ -340,6 +340,49 @@ CREATE TABLE IF NOT EXISTS consent_cohort (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- A live sales conversation. Foundry opens it, answers what comes back, and
+-- keeps working it until it closes one way or the other. `state` is what stops
+-- the agent talking forever: WON and LOST are terminal, and nothing is sent
+-- into a terminal conversation.
+CREATE TABLE IF NOT EXISTS conversations (
+  id             TEXT PRIMARY KEY,
+  business_id    TEXT,
+  segment_id     TEXT,
+  username       TEXT        NOT NULL UNIQUE,
+  x_user_id      TEXT        NOT NULL,
+  state          TEXT        NOT NULL DEFAULT 'OPENED'
+                  CHECK (state IN ('OPENED', 'ENGAGED', 'OBJECTION', 'CLOSING', 'WON', 'LOST', 'HANDED_OFF')),
+  -- How many replies the agent has sent. Caps the persistence.
+  agent_turns    INTEGER     NOT NULL DEFAULT 0,
+  last_inbound_at  TIMESTAMPTZ,
+  last_outbound_at TIMESTAMPTZ,
+  closed_at      TIMESTAMPTZ,
+  close_reason   TEXT        NOT NULL DEFAULT '',
+  support_channel TEXT       NOT NULL DEFAULT '',
+  meta           JSONB       NOT NULL DEFAULT '{}'::jsonb,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS conversations_state_idx ON conversations (state);
+
+-- Every message in both directions, append-only so the transcript of a sale
+-- cannot be rewritten after the fact.
+CREATE TABLE IF NOT EXISTS conversation_messages (
+  id              TEXT PRIMARY KEY,
+  conversation_id TEXT        NOT NULL REFERENCES conversations (id),
+  direction       TEXT        NOT NULL CHECK (direction IN ('out', 'in')),
+  channel         TEXT        NOT NULL DEFAULT 'x',
+  external_id     TEXT,
+  text            TEXT        NOT NULL,
+  model           TEXT        NOT NULL DEFAULT '',
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (channel, external_id)
+);
+
+CREATE INDEX IF NOT EXISTS conversation_messages_conv_idx
+  ON conversation_messages (conversation_id, created_at);
+
 -- ---------------------------------------------------------------------------
 -- Forward migrations for databases created by an earlier revision.
 -- ---------------------------------------------------------------------------
@@ -352,6 +395,12 @@ ALTER TABLE businesses        ADD COLUMN IF NOT EXISTS billing           TEXT   
 ALTER TABLE businesses        ADD COLUMN IF NOT EXISTS billing_interval  TEXT    NOT NULL DEFAULT 'month';
 ALTER TABLE businesses        ADD COLUMN IF NOT EXISTS subscriber_target INTEGER NOT NULL DEFAULT 100;
 ALTER TABLE audience_segments ADD COLUMN IF NOT EXISTS billing           TEXT    NOT NULL DEFAULT 'subscription';
+
+-- Not everyone on the allowlist is in the follow graph, so the evidence used to
+-- describe them cannot come from audience_members. It lives here instead, which
+-- keeps audience_members strictly the network and stops the clustering corpus
+-- from being seeded with people who were never in it.
+ALTER TABLE consent_cohort ADD COLUMN IF NOT EXISTS bio TEXT NOT NULL DEFAULT '';
 ALTER TABLE audience_segments ADD COLUMN IF NOT EXISTS subscriber_target INTEGER NOT NULL DEFAULT 100;
 -- Retired at an operator reset. Hidden from the portfolio, but its ledger and
 -- decision history stay — those tables are append-only and a reset must not be
@@ -379,6 +428,11 @@ CREATE TRIGGER ledger_entries_append_only
 DROP TRIGGER IF EXISTS decisions_append_only ON decisions;
 CREATE TRIGGER decisions_append_only
   BEFORE UPDATE OR DELETE ON decisions
+  FOR EACH ROW EXECUTE FUNCTION foundry_append_only();
+
+DROP TRIGGER IF EXISTS conversation_messages_append_only ON conversation_messages;
+CREATE TRIGGER conversation_messages_append_only
+  BEFORE UPDATE OR DELETE ON conversation_messages
   FOR EACH ROW EXECUTE FUNCTION foundry_append_only();
 
 DROP TRIGGER IF EXISTS machine_runs_append_only ON machine_runs;

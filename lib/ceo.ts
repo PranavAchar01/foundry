@@ -99,6 +99,35 @@ export async function runCycle(opts: CycleOptions = {}): Promise<CycleResult> {
     };
   }
 
+  // --- 0b. answer anything that came back on an open deal -------------------
+  // A reply is only generated in response to an inbound message, so an idle
+  // conversation costs nothing here and nobody gets a follow-up they did not
+  // ask for.
+  if (env.xClientId) {
+    try {
+      const { poll } = await import('./conversation');
+      const inbox = await poll();
+      if (inbox.replies.length || inbox.matched) {
+        const row = await decisions.record({
+          cycleId,
+          action: 'CONVERSATIONS_WORKED',
+          reasoning:
+            `Read ${inbox.fetched} DM event(s), matched ${inbox.matched} to open deals, and sent ` +
+            `${inbox.replies.filter((r) => r.replied).length} repl(y|ies).`,
+          confidence: 1,
+          model: 'guardrail',
+          outputs: { fetched: inbox.fetched, matched: inbox.matched, replies: inbox.replies },
+        });
+        steps.push({
+          businessId: null, action: 'CONVERSATIONS_WORKED', reasoning: row.reasoning,
+          decisionId: row.id, model: 'guardrail', spentUsd: 0,
+        });
+      }
+    } catch {
+      /* the inbox is not worth failing a cycle over */
+    }
+  }
+
   // --- 1. collect any human answers that landed since last cycle ------------
   const answered = await collectAnswers(laborProvider()).catch(() => 0);
   if (answered > 0) {

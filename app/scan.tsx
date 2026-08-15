@@ -1,14 +1,21 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 /**
- * The scan animation.
+ * The scan.
  *
- * Handles stream past, dim as they are ruled out, and the ones that survive
- * settle into the shortlist. The pacing is cosmetic; the handles, the counts and
- * the final list all come from the run itself, so what you watch is the real
- * result arriving rather than a canned reel.
+ * A continuous reel of the real network runs under a fixed reticle. Accounts
+ * that clear the filter flash and lock into the shortlist on the right as they
+ * are passed; everything else dims and keeps moving. When the reel finishes the
+ * shortlist expands into the final grid.
+ *
+ * The rAF loop touches the DOM directly and deliberately: it writes one
+ * transform and moves one CSS class. Driving row emphasis through React state
+ * instead means re-rendering the whole list on every frame, which starves the
+ * main thread badly enough to stall animations running next to it — so the only
+ * things that reach React here are the shortlist locking in and a throttled
+ * counter.
  */
 
 export interface ScanTarget {
@@ -17,136 +24,229 @@ export interface ScanTarget {
 }
 
 interface Props {
-  /** Every handle in the network, streamed past during the sweep. */
   pool: string[];
-  /** Who survives. The animation lands here. */
   chosen: ScanTarget[];
-  /** Called once the animation settles. */
-  onDone?: () => void;
   active: boolean;
+  onDone?: () => void;
 }
 
-type Phase = 'sweep' | 'narrow' | 'settled';
+type Phase = 'sweep' | 'settled';
 
-export default function Scan({ pool, chosen, onDone, active }: Props) {
+const ROW_H = 26;
+const SWEEP_MS = 4200;
+const VISIBLE = 11;
+/** The counter is read, not watched — refreshing it ~12×/s is plenty. */
+const COUNTER_MS = 80;
+
+export default function Scan({ pool, chosen, active, onDone }: Props) {
   const [phase, setPhase] = useState<Phase>('sweep');
-  const [cursor, setCursor] = useState(0);
   const [scanned, setScanned] = useState(0);
-  const [revealed, setRevealed] = useState(0);
+  const [locked, setLocked] = useState<string[]>([]);
+
+  const reel = useRef<HTMLDivElement | null>(null);
+  const reticle = useRef<HTMLDivElement | null>(null);
   const raf = useRef<number | null>(null);
+  const lockedRef = useRef<Set<string>>(new Set());
+  const lastIndex = useRef(-1);
+  const currentRow = useRef<HTMLElement | null>(null);
+  const flashUntil = useRef(0);
 
-  // Sweep: run the cursor through the pool, counting as it goes.
-  useEffect(() => {
-    if (!active || phase !== 'sweep' || pool.length === 0) return;
-    const started = performance.now();
-    const duration = 2600;
+  const chosenSet = useMemo(
+    () => new Set(chosen.map((c) => c.username.toLowerCase())),
+    [chosen],
+  );
 
-    const tick = (now: number) => {
-      const t = Math.min(1, (now - started) / duration);
-      // Ease-out so it decelerates into the narrowing step.
-      const eased = 1 - Math.pow(1 - t, 3);
-      setCursor(Math.floor(eased * pool.length));
-      setScanned(Math.floor(eased * pool.length));
-      if (t < 1) raf.current = requestAnimationFrame(tick);
-      else setPhase('narrow');
-    };
-    raf.current = requestAnimationFrame(tick);
-    return () => {
-      if (raf.current) cancelAnimationFrame(raf.current);
-    };
-  }, [active, phase, pool.length]);
-
-  // Narrow: reveal the survivors one at a time.
-  useEffect(() => {
-    if (phase !== 'narrow') return;
-    if (revealed >= chosen.length) {
-      const t = setTimeout(() => {
-        setPhase('settled');
-        onDone?.();
-      }, 400);
-      return () => clearTimeout(t);
-    }
-    const t = setTimeout(() => setRevealed((n) => n + 1), 220);
-    return () => clearTimeout(t);
-  }, [phase, revealed, chosen.length, onDone]);
+  /*
+   * Put the shortlist at even intervals through the reel so matches land
+   * steadily instead of clumping wherever the follower count happened to sort
+   * them. The handles are real; only their position in the reel is arranged.
+   */
+  const ordered = useMemo(() => {
+    if (!pool.length) return [];
+    const rest = pool.filter((p) => !chosenSet.has(p.toLowerCase()));
+    const out = [...rest];
+    const names = chosen.map((c) => c.username);
+    const gap = Math.max(1, Math.floor(out.length / (names.length + 1)));
+    names.forEach((n, i) => out.splice(Math.min(out.length, (i + 1) * gap), 0, n));
+    return out;
+  }, [pool, chosen, chosenSet]);
 
   useEffect(() => {
     if (!active) {
       setPhase('sweep');
-      setCursor(0);
       setScanned(0);
-      setRevealed(0);
+      setLocked([]);
+      lockedRef.current = new Set();
+      lastIndex.current = -1;
+      currentRow.current = null;
+      return;
     }
-  }, [active]);
+    if (phase !== 'sweep' || ordered.length === 0) return;
+
+    const started = performance.now();
+    let counterAt = 0;
+
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - started) / SWEEP_MS);
+      // Fast start, long settle — reads as "searching" then "deciding".
+      const eased = 1 - Math.pow(1 - t, 2.4);
+      const pos = eased * (ordered.length - 1);
+      const i = Math.floor(pos);
+
+      if (reel.current) {
+        reel.current.style.transform = `translate3d(0, ${-pos * ROW_H}px, 0)`;
+      }
+
+      if (i !== lastIndex.current) {
+        // Move the emphasis by hand: two class writes, whatever the reel size.
+        const next = reel.current?.children[i] as HTMLElement | undefined;
+        if (next !== currentRow.current) {
+          currentRow.current?.classList.remove('is-current');
+          next?.classList.add('is-current');
+          currentRow.current = next ?? null;
+        }
+
+        /*
+         * The reel crosses several rows per frame at speed, so checking only the
+         * row under the reticle silently skips matches — which is what made the
+         * counter disagree with the shortlist. Sweep everything crossed since
+         * the last frame instead.
+         */
+        for (let k = lastIndex.current + 1; k <= i; k++) {
+          const handle = ordered[k];
+          if (!handle || !chosenSet.has(handle.toLowerCase())) continue;
+          if (lockedRef.current.has(handle)) continue;
+          lockedRef.current.add(handle);
+          setLocked((prev) => [...prev, handle]);
+          flashUntil.current = now + 380;
+        }
+        lastIndex.current = i;
+      }
+
+      if (reticle.current) {
+        reticle.current.classList.toggle('reticle-hot', now < flashUntil.current);
+      }
+      if (now - counterAt > COUNTER_MS) {
+        counterAt = now;
+        setScanned(i + 1);
+      }
+
+      if (t < 1) {
+        raf.current = requestAnimationFrame(tick);
+        return;
+      }
+
+      setScanned(ordered.length);
+      setTimeout(() => {
+        // Anything the sweep somehow missed still lands when it settles.
+        setLocked(chosen.map((c) => c.username));
+        setPhase('settled');
+        onDone?.();
+      }, 320);
+    };
+
+    raf.current = requestAnimationFrame(tick);
+    return () => {
+      if (raf.current) cancelAnimationFrame(raf.current);
+    };
+  }, [active, phase, ordered, chosenSet, chosen, onDone]);
 
   if (!active) return null;
 
-  // A moving window of handles for the sweep.
-  const window = pool.slice(Math.max(0, cursor - 9), cursor + 9);
+  const seen = Math.min(scanned, ordered.length);
+  const progress = ordered.length ? seen / ordered.length : 0;
 
   return (
     <div className="overflow-hidden rounded-2xl border border-[var(--color-line)] bg-[var(--color-bg)]">
-      {/* status line */}
-      <div className="flex items-center justify-between border-b border-[var(--color-line)] px-4 py-2.5 font-mono text-[11px]">
-        <span className="text-[var(--color-muted)]">
-          {phase === 'sweep'
-            ? 'scanning network'
-            : phase === 'narrow'
-              ? 'narrowing to targetable accounts'
-              : 'shortlist'}
-        </span>
-        <span className="text-[var(--color-dim)] tabular-nums">
-          {phase === 'sweep'
-            ? `${scanned} / ${pool.length}`
-            : `${chosen.length} of ${pool.length}`}
+      {/* header */}
+      <div className="flex items-center justify-between border-b border-[var(--color-line)] px-4 py-2.5">
+        <div className="flex items-center gap-2.5">
+          <span
+            className={`inline-block h-1.5 w-1.5 rounded-full ${
+              phase === 'sweep' ? 'bg-[var(--color-fg)] pulse' : 'bg-[var(--color-dim)]'
+            }`}
+          />
+          <span className="font-mono text-[11px] tracking-wide text-[var(--color-muted)]">
+            {phase === 'sweep' ? 'scanning network' : 'shortlist'}
+          </span>
+        </div>
+        <span className="font-mono text-[11px] tabular-nums text-[var(--color-dim)]">
+          {seen.toLocaleString()} / {ordered.length.toLocaleString()}
+          <span className="mx-2 text-[var(--color-line)]">·</span>
+          <span className="text-[var(--color-fg)]">{locked.length} matched</span>
         </span>
       </div>
 
-      {phase === 'sweep' && (
-        <div className="relative h-[188px]">
-          {/* the stream */}
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-0.5">
-            {window.map((h, i) => {
-              const distance = Math.abs(i - 9);
-              return (
-                <div
-                  key={`${h}-${i}`}
-                  className="font-mono text-[12px] whitespace-nowrap transition-none"
-                  style={{
-                    opacity: Math.max(0.06, 1 - distance * 0.18),
-                    transform: `scale(${Math.max(0.86, 1 - distance * 0.03)})`,
-                    color: distance === 0 ? 'var(--color-fg)' : 'var(--color-dim)',
-                    fontWeight: distance === 0 ? 600 : 400,
-                  }}
+      {phase === 'sweep' ? (
+        <div className="grid grid-cols-[1fr_auto] gap-px bg-[var(--color-line)]">
+          {/* the reel */}
+          <div
+            className="relative overflow-hidden bg-[var(--color-bg)]"
+            style={{
+              height: VISIBLE * ROW_H,
+              maskImage:
+                'linear-gradient(to bottom, transparent, #000 22%, #000 78%, transparent)',
+              WebkitMaskImage:
+                'linear-gradient(to bottom, transparent, #000 22%, #000 78%, transparent)',
+            }}
+          >
+            <div
+              ref={reel}
+              className="absolute inset-x-0 will-change-transform"
+              style={{ top: (VISIBLE * ROW_H) / 2 - ROW_H / 2 }}
+            >
+              {ordered.map((h, i) => {
+                const isMatch = chosenSet.has(h.toLowerCase());
+                return (
+                  <div
+                    key={`${h}-${i}`}
+                    className={`scan-row${isMatch ? ' is-match' : ''}`}
+                    style={{ height: ROW_H }}
+                  >
+                    <span className="truncate">@{h}</span>
+                    {isMatch && <span className="scan-match">MATCH</span>}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* reticle */}
+            <div className="pointer-events-none absolute top-1/2 right-3 left-3 -translate-y-1/2">
+              <div ref={reticle} className="reticle h-[26px] rounded-md border" />
+            </div>
+          </div>
+
+          {/* the locking shortlist */}
+          <div
+            className="w-[210px] bg-[var(--color-panel)] px-4 py-3"
+            style={{ height: VISIBLE * ROW_H }}
+          >
+            <p className="mb-2 font-mono text-[9.5px] tracking-[0.14em] text-[var(--color-dim)] uppercase">
+              targetable
+            </p>
+            <div className="space-y-1.5">
+              {locked.map((h) => (
+                <p
+                  key={h}
+                  className="truncate font-mono text-[11.5px]"
+                  style={{ animation: 'foundry-in .32s ease-out' }}
                 >
                   @{h}
-                </div>
-              );
-            })}
-          </div>
-          {/* the reticle */}
-          <div className="pointer-events-none absolute top-1/2 right-6 left-6 h-7 -translate-y-1/2 rounded-md border border-[var(--color-fg)]/25" />
-          {/* progress */}
-          <div className="absolute right-0 bottom-0 left-0 h-[2px] bg-[var(--color-line)]">
-            <div
-              className="h-full bg-[var(--color-fg)] transition-none"
-              style={{ width: `${(scanned / Math.max(1, pool.length)) * 100}%` }}
-            />
+                </p>
+              ))}
+              {locked.length === 0 && (
+                <p className="font-mono text-[11px] text-[var(--color-dim)]">—</p>
+              )}
+            </div>
           </div>
         </div>
-      )}
-
-      {(phase === 'narrow' || phase === 'settled') && (
+      ) : (
         <div className="grid grid-cols-2 gap-px bg-[var(--color-line)] sm:grid-cols-4">
           {chosen.map((c, i) => (
             <div
               key={c.username}
               className="bg-[var(--color-panel)] px-4 py-3"
-              style={{
-                opacity: i < revealed || phase === 'settled' ? 1 : 0,
-                transform: i < revealed || phase === 'settled' ? 'none' : 'translateY(6px)',
-                transition: 'opacity .35s ease, transform .35s ease',
-              }}
+              style={{ animation: `foundry-in .4s ease-out ${i * 45}ms both` }}
             >
               <p className="truncate font-mono text-[12px] font-medium">@{c.username}</p>
               {c.reason && (
@@ -158,6 +258,14 @@ export default function Scan({ pool, chosen, onDone, active }: Props) {
           ))}
         </div>
       )}
+
+      {/* progress */}
+      <div className="h-[2px] bg-[var(--color-line)]">
+        <div
+          className="h-full bg-[var(--color-fg)]"
+          style={{ width: `${progress * 100}%`, transition: 'width .12s linear' }}
+        />
+      </div>
     </div>
   );
 }

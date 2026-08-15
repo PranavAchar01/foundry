@@ -974,3 +974,45 @@ shortlist. The pacing is cosmetic; the 600 handles and the 8 that land are both
 read from the database, so it animates the real result rather than a reel.
 
 Gate green — lint, typecheck, build. Deployed.
+
+## The sweep tells the truth about who it found
+
+The scan was claiming things that were not so. It reported "3 matched" while
+showing eight names, because at speed the reel crosses several rows per frame
+and only the row directly under the reticle was ever tested — every match the
+sweep flew past was silently dropped. It now sweeps the whole crossed range, so
+the counter and the shortlist agree: 608 / 608 · 8 matched.
+
+Its header comment claimed the animation cost "one composited layer rather than
+600 React re-renders". That was false: the loop called `setIndex` on every
+frame, re-rendering the entire list each time. Row emphasis moved to CSS and the
+loop now writes one transform and toggles one class, so per-frame cost is
+constant however large the network gets. The counter refreshes ~12×/s, which is
+as often as a number can usefully be read.
+
+The shortlist was also labelled with the cohort note — "volunteered for the
+demo" — which put the demo scaffolding on screen, exactly where it does not
+belong. Labels now carry the evidence the clustering actually keys on.
+
+Two data problems surfaced underneath that, both real:
+
+- **Nothing had ever written `audience_members.segment_id`.** All 600 rows were
+  unassigned, and `member_count` was the model's own guess at how many bios fit,
+  never a count. The clustering model is shown bios with handles stripped, so it
+  cannot say who went where — membership is now derived by re-matching each bio
+  against the keywords it keyed on, and `member_count` is a count. 503 of 1,770
+  bios matched a segment; the rest are left unassigned, because "no segment fits
+  this person" is a real answer.
+
+- **The follow graph was truncated at 600.** The sync is paged and had simply
+  been stopped early. The full list is 1,880 accounts.
+
+Even complete, five of the eight allowlisted handles are not in the following
+list at all — the sweep had been splicing them into a network that does not
+contain them. Their evidence cannot come from `audience_members` without seeding
+the clustering corpus with people who were never in it, so the allowlist now
+carries its own bio, fetched in one batch request. The first attempt looked like
+it worked and did not: eight sequential lookups exhausted the per-request quota
+and the failure was swallowed by a `catch`, leaving the bios empty while the
+already-stored user ids made the rows look populated.
+
