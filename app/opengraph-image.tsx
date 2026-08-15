@@ -1,8 +1,10 @@
 import { ImageResponse } from 'next/og';
 
 /**
- * The unfurl card. Same greyscale system as the dashboard: ink on Apple grey,
- * the numbers carried by weight rather than colour.
+ * The unfurl card. Dusk palette: plum ground, pale-peach serif display,
+ * mauve secondary, one pink ember on the final words. Hedvig can't be
+ * loaded in the edge ImageResponse without bundling the font file, so
+ * Georgia stands in for the serif.
  */
 
 export const runtime = 'edge';
@@ -20,17 +22,26 @@ export default function OgImage() {
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
-          background: '#f5f5f7',
-          color: '#1d1d1f',
+          background: '#241540',
+          color: '#f7e3d3',
           padding: 72,
           fontFamily: 'Helvetica, Arial, sans-serif',
         }}
       >
         <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <div style={{ fontSize: 96, fontWeight: 700, letterSpacing: '-0.03em', display: 'flex' }}>
+          <div
+            style={{
+              fontSize: 96,
+              fontWeight: 400,
+              letterSpacing: '-0.03em',
+              fontFamily: 'Georgia, Cambria, serif',
+              color: '#f7e3d3',
+              display: 'flex',
+            }}
+          >
             FOUNDRY.
           </div>
-          <div style={{ fontSize: 34, color: '#6e6e73', marginTop: 20, maxWidth: 900, display: 'flex' }}>
+          <div style={{ fontSize: 34, color: '#c3b0dd', marginTop: 20, maxWidth: 900, display: 'flex' }}>
             An autonomous holding company. It spawns businesses, funds them, reads the P&L, and
             kills the losers.
           </div>
@@ -40,15 +51,16 @@ export default function OgImage() {
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'flex-end',
-            borderTop: '2px solid #d2d2d7',
+            borderTop: '2px solid rgba(247,227,211,0.2)',
             paddingTop: 32,
           }}
         >
-          <div style={{ fontSize: 26, color: '#86868b', display: 'flex' }}>
+          <div style={{ fontSize: 26, color: '#9680bb', display: 'flex' }}>
             No human in the loop.
           </div>
-          <div style={{ fontSize: 26, color: '#1d1d1f', fontWeight: 600, display: 'flex' }}>
-            hypothesis → spawn → deploy → measure → allocate or kill
+          <div style={{ fontSize: 26, color: '#f7e3d3', display: 'flex' }}>
+            hypothesis → spawn → deploy → measure →{' '}
+            <span style={{ color: '#ff5fa2', marginLeft: 8 }}>allocate or kill</span>
           </div>
         </div>
       </div>
