@@ -136,15 +136,28 @@ console.log(bad('FAIL') + `  deployment finished as ${state}`);
 if (final.errorMessage) console.log(dim('       ' + final.errorMessage));
 
 if (state === 'BLOCKED') {
+  // BLOCKED carries no errorMessage. The actual cause is on `seatBlock`.
+  const block = final.seatBlock ?? {};
   const user = await fetch('https://api.vercel.com/v2/user', {
     headers: { Authorization: `Bearer ${TOKEN}` },
   }).then((r) => r.json());
+
   console.log(
     warn('NOTE') +
-      `  account "${user.user?.username}" has limited=${user.user?.limited}. Vercel puts a` +
-      ' deployment in BLOCKED when the account is over its plan limits; the fix is on the' +
-      ' Vercel dashboard, not in this repository.',
+      `  seatBlock.blockCode = ${block.blockCode ?? 'unknown'}, isVerified = ${block.isVerified}` +
+      `, account "${user.user?.username}" limited = ${user.user?.limited}.`,
   );
+  if (block.blockCode === 'TEAM_ACCESS_REQUIRED') {
+    console.log(
+      dim(
+        '       Vercel is refusing deployments that contain serverless functions until this\n' +
+          '       account completes verification. Static deployments are unaffected, which is\n' +
+          '       why spawned businesses deploy fine. Fix it at https://vercel.com/account —\n' +
+          '       complete account verification, then re-run `pnpm deploy && pnpm smoke`.\n' +
+          '       There is no change to this repository that resolves it.',
+      ),
+    );
+  }
 }
 process.exit(1);
 
