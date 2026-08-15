@@ -666,10 +666,23 @@ export async function snapshot(
   if (!row) throw new Error(`${businessId} has no machine`);
 
   const box = await (await sdk()).connect(row.external_id, { apiKey: requireKey() });
+
+  // A parked machine has to be woken before it can answer. `resume()` conflicts
+  // if a wake is already in flight — from another viewer, or from the CEO cycle
+  // — so treat that as "someone else is already doing it" and wait for the
+  // machine to come up rather than failing the view.
   if (row.status === 'paused') {
-    await box.resume();
+    await box.resume().catch((err: unknown) => {
+      if (!/conflict/i.test(String(err))) throw err;
+    });
+    for (let i = 0; i < 12; i++) {
+      const info = await box.getInfo().catch(() => null);
+      if (info?.status === 'active') break;
+      await new Promise((r) => setTimeout(r, 1000));
+    }
     await query(`UPDATE machines SET status = 'active', last_started_at = now() WHERE id = $1`, [row.id]);
   }
+
   const res = await box.commands.run(command, { timeoutMs: 15_000 });
   return { stdout: res.stdout ?? '', stderr: res.stderr ?? '' };
 }
