@@ -1,0 +1,7 @@
+# pnpm 11 reads build-script approvals from here, not package.json.
+# All three ship prebuilt native binaries and need their install scripts to
+# unpack the right one for the platform.
+allowBuilds:
+  esbuild: true
+  sharp: true
+  unrs-resolver: true

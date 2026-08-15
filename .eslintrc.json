@@ -1,0 +1,14 @@
+{
+  "extends": ["next/core-web-vitals", "next/typescript"],
+  "ignorePatterns": ["landing/**", "node_modules/**", ".next/**", "scripts/**"],
+  "rules": {
+    "@typescript-eslint/no-explicit-any": "warn",
+    "@next/next/no-html-link-for-pages": "off"
+  },
+  "overrides": [
+    {
+      "files": ["lib/terac.ts"],
+      "rules": { "@typescript-eslint/no-explicit-any": "off" }
+    }
+  ]
+}
