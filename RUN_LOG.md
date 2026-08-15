@@ -232,3 +232,33 @@ retrying blindly:
 `patelkula53@gmail.com`, which is not the repository owner's address
 (`achar.pranav@gmail.com`). Verifying a different Vercel account does not clear
 `limited` on this one. Nothing in this repository can resolve it.
+
+## 2026-08-15 — Iteration 12 · third deploy attempt, and the identity mismatch
+
+Owner reported verifying "the right account". Re-checked, then deployed:
+
+```
+token account : patelkula53-5172 <patelkula53@gmail.com>   limited = true
+deploy        : dpl_HZeq3RubtY2jR8MUA1CFykSp6BM6 -> BLOCKED
+                seatBlock.blockCode = TEAM_ACCESS_REQUIRED, isVerified = false
+```
+
+Identical to the two previous attempts. Stopped retrying and enumerated what
+the Vercel account is actually connected to:
+
+```
+createdDirectToHobby : true
+membership           : role=OWNER, confirmed=true
+git namespaces       : github -> Kula6475, Web-Design-Initiative
+                       gitlab -> none, bitbucket -> none
+```
+
+**The decisive fact:** this Vercel account's GitHub connection is to
+`Kula6475` / `Web-Design-Initiative` — **not** `PranavAchar01`. That is why
+`POST /projects/:id/link` returns `repo_not_found` for `PranavAchar01/foundry`,
+and it confirms `patelkula53@gmail.com` is a different identity from the
+repository owner (`achar.pranav@gmail.com` / `PranavAchar01`).
+
+So the account that must clear `limited` is `patelkula53@gmail.com`, signed in
+via GitHub `Kula6475`. Verifying any other Vercel account has no effect on it.
+Three attempts, three identical blocks; no further retry is informative.
