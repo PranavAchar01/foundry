@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 /**
  * One company, everything at once.
@@ -52,6 +52,58 @@ interface Detail {
 }
 
 const clock = (iso: string) => new Date(iso).toLocaleTimeString('en-US', { hour12: false });
+
+/**
+ * The viewport the storefront is rendered at before being scaled to fit.
+ *
+ * A real desktop frame, deliberately. These heroes are sized in `vh`, so a
+ * taller iframe does not reveal more page — it stretches the hero. 1280x900
+ * renders the design at the proportions it was built for, and scaling that
+ * whole frame down means the complete hero, price and CTA are visible rather
+ * than the top slice of them.
+ */
+const SITE_W = 1280;
+const SITE_H = 900;
+
+/**
+ * The storefront, whole.
+ *
+ * Dropping the page into a pane-width iframe crops it — you get the top 420px
+ * of a full-height hero and nothing else. So it is rendered at a real desktop
+ * viewport and scaled down by however much it takes to fit the pane, with the
+ * container's height following the same scale. The result is the entire frame,
+ * proportioned correctly, rather than a window onto its top-left corner.
+ */
+function SiteFrame({ url, title }: { url: string; title: string }) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [scale, setScale] = useState(0);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => setScale(el.clientWidth / SITE_W);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  return (
+    <div ref={ref} className="relative w-full overflow-hidden bg-white"
+         style={{ height: scale ? SITE_H * scale : 420 }}>
+      {scale > 0 && (
+        <iframe
+          src={url}
+          title={title}
+          scrolling="no"
+          sandbox="allow-scripts allow-same-origin"
+          className="absolute top-0 left-0 origin-top-left border-0"
+          style={{ width: SITE_W, height: SITE_H, transform: `scale(${scale})` }}
+        />
+      )}
+    </div>
+  );
+}
 
 export default function CompanyDetail({ id, onClose }: { id: string; onClose: () => void }) {
   const [data, setData] = useState<Detail | null>(null);
@@ -175,12 +227,7 @@ export default function CompanyDetail({ id, onClose }: { id: string; onClose: ()
             badge={b ? b.status : ''}
           >
             {b?.url ? (
-              <iframe
-                src={b.url}
-                title={`${b.name} storefront`}
-                className="h-[420px] w-full border-0 bg-white"
-                sandbox="allow-scripts allow-same-origin"
-              />
+              <SiteFrame url={b.url} title={`${b.name} storefront`} />
             ) : (
               <Empty>No storefront.</Empty>
             )}
@@ -192,9 +239,14 @@ export default function CompanyDetail({ id, onClose }: { id: string; onClose: ()
             badge={m?.status ?? ''}
           >
             {m ? (
-              <div className="relative h-[420px] bg-black">
+              <div className="relative h-full min-h-[420px] bg-black">
                 <pre className="thin-scroll h-full overflow-auto px-4 py-3 font-mono text-[11px] leading-[1.45] whitespace-pre text-white">
-{console_ || (consoleErr ? `! ${consoleErr}` : 'connecting to the machine…')}
+{console_ ||
+  (consoleErr
+    ? /conflict|valid state/i.test(consoleErr)
+      ? 'machine is parked — waking it…'
+      : `! ${consoleErr}`
+    : 'connecting to the machine…')}
                 </pre>
                 <span className="absolute right-3 bottom-2 font-mono text-[9.5px] text-white/40">
                   {consoleAt ? `live · ${clock(consoleAt)}` : 'live'}
@@ -297,7 +349,7 @@ function Pane({
   children: React.ReactNode;
 }) {
   return (
-    <section className="bg-[var(--color-panel)]">
+    <section className="flex h-full flex-col bg-[var(--color-panel)]">
       <div className="flex items-center justify-between gap-3 px-4 py-2">
         <div className="min-w-0">
           <p className="font-mono text-[10px] tracking-wider text-[var(--color-muted)] uppercase">
@@ -311,14 +363,14 @@ function Pane({
           </span>
         )}
       </div>
-      {children}
+      <div className="min-h-0 flex-1">{children}</div>
     </section>
   );
 }
 
 function Empty({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex h-[420px] items-center justify-center p-8 text-center text-sm text-[var(--color-dim)]">
+    <div className="flex h-full min-h-[420px] items-center justify-center p-8 text-center text-sm text-[var(--color-dim)]">
       {children}
     </div>
   );

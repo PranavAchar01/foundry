@@ -759,3 +759,60 @@ Fixed both properties:
 
 Ran repair-only: 6 left alone, 1 repaired. All 7 storefronts serve 200 and
 `pnpm smoke` is back to green.
+
+## 2026-08-15 — Iteration 20 · every storefront rebuilt on Lovable, Vercel cleared
+
+Owner asked to spawn with Lovable and remove the Vercel sites.
+
+### There is no Lovable API key — the MCP server is the product
+
+The key supplied (`lov_1a2b3c…`) returned 401 on every header form, but that was
+not really the problem: per Lovable's own docs, the only shipped REST surface is
+**Build with URL**, which is browser-interactive (sign in, pick a workspace).
+There is no bearer-token API. The programmatic path is the **MCP server**, which
+was already connected to this session. Authenticated as
+`achar.pranav@gmail.com`, workspace `Pranav's Lovable`.
+
+`LOVABLE_API_KEY` was left empty so `LovablePagegenProvider` keeps reporting
+itself unconfigured rather than pretending.
+
+### A trap worth recording
+
+`create_project` returns `status: "completed"` about two seconds after the call
+— the initial message is *accepted*, not *built*. Deploying at that point
+publishes an empty scaffold, which is exactly what happened on the first
+attempt. The build only runs when you `send_message` and wait. Every site here
+was built with an explicit build turn.
+
+### Seven storefronts, seven distinct heroes
+
+All seven companies rebuilt and published on `lovable.app`, each with a hero
+chosen for its buyer — Archivo Black slab for personal trainers, Bodoni Moda for
+wedding photographers, Fraunces for the coffee roaster, Bricolage Grotesque for
+SaaS founders, Changa One for the Steam devs. Lovable's agent verified each one
+itself with Playwright, including the checkout POST, the redirect, the failure
+path and the beacon.
+
+Verified from here: **7/7 storefronts serving 200, 7/7 creating real
+`cs_live_…` Stripe sessions** through the rewired checkout.
+
+### Vercel cleared
+
+**7/7 `foundry-biz-*` storefront projects deleted.** `foundry-biz` (the
+dashboard) and `landing` protected by name; the account's ~40 unrelated projects
+untouched. `FOUNDRY_MAX_BUSINESSES` dropped to 6 so the cron cannot quietly
+create new Vercel storefronts — Foundry's own pipeline still hosts on Vercel,
+because the Lovable provider has no headless credential.
+
+### Two rendering truths the tiles exposed
+
+- Lovable ships client-rendered TanStack apps, so a `fetch`-based content check
+  sees the SSR shell and can miss the contract strings. Verification of a
+  Lovable page has to happen in a browser.
+- Those apps take ~15–20s to paint inside seven simultaneous scaled iframes.
+  The tiles are blank until then — slow, but correct.
+
+Machines: the cycle parks anything idle over 15 minutes, so a paused VM's
+preview returns 503 by design. The detail view now streams the machine's live
+stdout instead of embedding its preview, so a parked machine reads as parked
+rather than broken.
