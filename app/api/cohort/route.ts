@@ -4,10 +4,14 @@ import { errorMessage, json } from '@/lib/http';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-/** Who Foundry is permitted to contact. Nothing else can be messaged. */
+/** Who Foundry is permitted to contact, plus the pool the sweep streams. */
 export async function GET() {
   try {
-    return json({ cohort: await cohort.list() });
+    const { query } = await import('@/lib/db');
+    const pool = await query<{ username: string }>(
+      `SELECT username FROM audience_members WHERE username <> '' ORDER BY followers DESC LIMIT 600`,
+    );
+    return json({ cohort: await cohort.list(), pool: pool.map((p) => p.username) });
   } catch (err) {
     return json({ error: errorMessage(err) }, { status: 500 });
   }

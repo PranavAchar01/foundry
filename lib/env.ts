@@ -70,8 +70,27 @@ export const env = {
   get xApiKeySecret() {
     return str('X_API_KEY_SECRET');
   },
+  /**
+   * Whose network to read. The Foundry account does the following and the
+   * DMing, but it is not the account with the network — so the audience is
+   * read from this handle instead of from whoever authorized.
+   */
+  get xAudienceHandle() {
+    return str('X_AUDIENCE_HANDLE');
+  },
   get xCallbackUrl() {
     return str('X_CALLBACK_URL') || `${this.publicUrl}/api/x/callback`;
+  },
+  /** Hard ceiling on a product's recurring price, in cents. */
+  get maxPriceCents() {
+    return num('FOUNDRY_MAX_PRICE_CENTS', 500);
+  },
+  /** Subscribers a one-off expert cost is amortised across. */
+  get subscriberTarget() {
+    return num('FOUNDRY_SUBSCRIBER_TARGET', 100);
+  },
+  get billingInterval() {
+    return str('FOUNDRY_BILLING_INTERVAL', 'month');
   },
   /** Share of the product price a hired human keeps. */
   get laborPayoutShare() {

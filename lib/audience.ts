@@ -105,7 +105,13 @@ const SEGMENT_TOOL: ToolSpec = {
               type: 'string',
               description: 'The concrete thing to sell them. A deliverable, not a category.',
             },
-            priceCents: { type: 'integer', description: 'One-time price in cents, 2900-99900.' },
+            priceCents: {
+              type: 'integer',
+              description:
+                'RECURRING price in cents per month. Hard ceiling 500 ($5.00). This is a ' +
+                'low-priced subscription, not a one-off — price it so a working person ' +
+                'subscribes without thinking about it.',
+            },
           },
           required: [
             'label', 'description', 'keywords', 'memberCount',
@@ -125,7 +131,10 @@ Rules that matter:
 - A segment is a MARKET, never a person. Never single out, name, or design around one account.
 - Judge willingness to pay from evidence in the bios — role seniority, whether they run something
   with a budget, whether the work implies a recurring painful task. Say what would falsify it.
-- Propose offers that can be delivered as a digital artifact plus, where useful, expert human time.
+- Every offer is a RECURRING subscription priced at or under $5.00 per month. Propose something
+  with a reason to keep paying each month — a recurring drop, an updated feed, an ongoing check —
+  not a one-off download dressed up as a subscription.
+- Offers can be delivered as a digital artifact plus, where useful, expert human time.
 - No segment built around medical, legal, or financial advice. Nothing aimed at minors.
 
 Be specific and falsifiable. "Technical people" is not a segment. "Solo founders shipping ML tooling
@@ -192,7 +201,7 @@ export async function cluster(sampleSize = 300): Promise<ClusterResult> {
         Math.min(1, Math.max(0, Number(s.willingness ?? 0))),
         String(s.reasoning ?? '').slice(0, 2000),
         String(s.proposedOffer ?? '').slice(0, 500),
-        Math.min(99900, Math.max(2900, Math.round(Number(s.priceCents ?? 4900)))),
+        Math.min(env.maxPriceCents, Math.max(100, Math.round(Number(s.priceCents ?? env.maxPriceCents)))),
       ],
     );
     saved.push(rows[0]);
@@ -248,7 +257,7 @@ function heuristicSegments(members: { bio: string }[]): RawSegment[] {
       'Heuristic fallback: the model was unavailable, so this is raw bio word frequency, ' +
       'not a judgement about willingness to pay. Treat it as a starting point only.',
     proposedOffer: `A practical toolkit for people working on ${word}.`,
-    priceCents: 4900,
+    priceCents: env.maxPriceCents,
   }));
 }
 

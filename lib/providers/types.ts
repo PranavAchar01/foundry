@@ -120,6 +120,9 @@ export interface PagegenProvider extends Capability {
 
 export interface CheckoutRequest {
   businessId: string;
+  /** 'subscription' switches Stripe to recurring billing. */
+  billing?: 'one_time' | 'subscription';
+  interval?: 'day' | 'week' | 'month' | 'year';
   productName: string;
   description: string;
   amountCents: number;

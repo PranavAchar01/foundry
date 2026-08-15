@@ -926,3 +926,51 @@ URL now requests the write scopes. Gate green — lint, typecheck, build,
 
 Still blocked on credentials: X needs the account created and authorized,
 Terac has no key (hiring runs on the seeded stub), Linq's token is rejected.
+
+## 2026-08-15 — Iteration 24 · real keys, $5 subscriptions, and the scan
+
+Both credentials verified live before anything was built on them:
+- **Terac REST** → 200, `Foundry · balance $125`. `LABOR_PROVIDER` now resolves
+  to `terac` on its own, so hiring is real rather than stubbed.
+- **Linq** → 200, number `+1 415 605 7165` provisioned.
+
+### The volunteer list, filtered on evidence
+
+Pulled all 14 bios from X and cut 6:
+- `@realharleychu` — "Cheat with AI (never get caught)". No product worth
+  building for academic-dishonesty tooling.
+- `@PranavAchar`, `@nithinaru` — the operator's own accounts.
+- `@risheetlenka` ("@LifeAtPurdue '30"), `@Tarun__y` ("Applied Mathematics @ UC
+  Berkeley") — students with no venture or budget to sell against.
+- `@shashankxgs` — "interested in fintech". Interest is consumption; there is no
+  business with a spending decision behind it.
+
+The 8 that remain are all actively building something, which is the only signal
+that supports a targeted product.
+
+### $5 subscriptions broke the hiring maths, and that was the real work
+
+A $5 product cannot fund a $103 expert out of one sale, so the per-sale margin
+test would have declined every hire. An expert review is a **one-off cost every
+subscriber receives**, so the budget is now the payout share of revenue across
+the first `FOUNDRY_SUBSCRIBER_TARGET` subscribers:
+
+    budget = price x share x subscribers = $5.00 x 0.75 x 100 = $375.00
+    Terac quoted $103.50 -> pays for itself at 21 subscribers
+
+Stripe moved to `mode: 'subscription'` with a recurring price. Two details the
+API enforces: `recurring` is rejected in payment mode, and `payment_intent_data`
+is rejected in subscription mode (`subscription_data` carries the attribution
+metadata instead). Verified live — a **$5.00/month session created**:
+`cs_live_a1sNTGGyWG4JY8ToQGp7FbTKTLeDBI4CbmKCy9mh9bGPKXpXX8kwUkEyBS`,
+`mode=subscription`, `amount_total=500`. Clustering is now capped at
+`FOUNDRY_MAX_PRICE_CENTS` and prompted for recurring offers.
+
+### The scan
+
+`app/scan.tsx` — handles stream past with an eased cursor and a reticle, the
+counter runs to the real pool size, then the survivors settle into the
+shortlist. The pacing is cosmetic; the 600 handles and the 8 that land are both
+read from the database, so it animates the real result rather than a reel.
+
+Gate green — lint, typecheck, build. Deployed.

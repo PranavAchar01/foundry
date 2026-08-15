@@ -29,8 +29,12 @@ export interface HireRequest {
   deliverable: string;
   /** Who is qualified, in marketplace panel terms. */
   expertProfile: string;
-  /** What the product sells for, in cents. */
+  /** What the product sells for, in cents (per interval when recurring). */
   productPriceCents: number;
+  /** 'subscription' amortises the hire across `subscriberTarget`. */
+  billing?: 'one_time' | 'subscription';
+  /** Subscribers the one-off expert cost is spread across. */
+  subscriberTarget?: number;
   /** Override the default share. */
   payoutShare?: number;
   cycleId?: string;
@@ -55,13 +59,24 @@ export async function hireForSegment(
 ): Promise<HireResult> {
   const listingId = id('lst');
   const share = req.payoutShare ?? env.laborPayoutShare;
-  const targetPayoutCents = Math.round(req.productPriceCents * share);
+
+  /*
+   * A $5/month product cannot fund a $100 expert out of a single sale, and
+   * testing it that way would decline every worthwhile hire. An expert review
+   * is a one-off cost that every subscriber receives, so the budget is the
+   * share of revenue it earns across the first `subscriberTarget` subscribers.
+   * One-time products keep the original per-sale test.
+   */
+  const recurring = req.billing === 'subscription';
+  const subscribers = recurring ? (req.subscriberTarget ?? env.subscriberTarget) : 1;
+  const targetPayoutCents = Math.round(req.productPriceCents * share * subscribers);
   const cycleId = req.cycleId ?? decisions.newCycleId();
 
   const task =
     `${req.deliverable}\n\n` +
-    `This is paid work for a product that sells for $${(req.productPriceCents / 100).toFixed(2)}. ` +
-    `The budget for this engagement is $${(targetPayoutCents / 100).toFixed(2)}.`;
+    `This is paid work for a product that sells for $${(req.productPriceCents / 100).toFixed(2)}` +
+    `${recurring ? '/month' : ''}. The budget for this engagement is ` +
+    `$${(targetPayoutCents / 100).toFixed(2)}.`;
 
   await query(
     `INSERT INTO labor_listings
@@ -125,10 +140,11 @@ export async function hireForSegment(
     return settle(
       'declined',
       `Declined to hire a ${req.role}: the marketplace quoted ` +
-        `$${(quotedCents / 100).toFixed(2)} but the product sells for ` +
-        `$${(req.productPriceCents / 100).toFixed(2)}, so at a ${Math.round(share * 100)}% payout ` +
-        `the budget is $${(targetPayoutCents / 100).toFixed(2)}. Hiring would cost more than the ` +
-        `product earns. Provider rationale: ${quote.reasoning}`,
+        `$${(quotedCents / 100).toFixed(2)} but the product earns ` +
+        `$${(req.productPriceCents / 100).toFixed(2)}${recurring ? `/month across ${subscribers} subscribers` : ''}, ` +
+        `so at a ${Math.round(share * 100)}% payout the budget is ` +
+        `$${(targetPayoutCents / 100).toFixed(2)}. Hiring would cost more than it earns. ` +
+        `Provider rationale: ${quote.reasoning}`,
       'MARGIN_NEGATIVE',
       quotedCents,
       null,
@@ -176,13 +192,18 @@ export async function hireForSegment(
     },
   });
 
-  const marginCents = req.productPriceCents - quotedCents;
+  const cohortRevenueCents = req.productPriceCents * subscribers;
+  const marginCents = cohortRevenueCents - quotedCents;
+  const paybackSubs = Math.ceil(quotedCents / Math.max(1, req.productPriceCents));
   return settle(
     'posted',
-    `Hired a ${req.role} for $${quote.totalCost} against a product priced at ` +
-      `$${(req.productPriceCents / 100).toFixed(2)} — a ${Math.round(share * 100)}% payout budget of ` +
-      `$${(targetPayoutCents / 100).toFixed(2)}, leaving $${(marginCents / 100).toFixed(2)} of gross margin ` +
-      `per sale. Provider rationale: ${quote.reasoning}`,
+    `Hired a ${req.role} for $${quote.totalCost}. The product bills ` +
+      `$${(req.productPriceCents / 100).toFixed(2)}${recurring ? '/month' : ''}` +
+      `${recurring ? ` and the cost is amortised across ${subscribers} subscribers` : ''}, ` +
+      `a ${Math.round(share * 100)}% payout budget of $${(targetPayoutCents / 100).toFixed(2)}. ` +
+      `${recurring ? `It pays for itself at ${paybackSubs} subscriber(s); ` : ''}` +
+      `margin across the cohort is $${(marginCents / 100).toFixed(2)}. ` +
+      `Provider rationale: ${quote.reasoning}`,
     '',
     quotedCents,
     opportunityId,

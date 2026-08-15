@@ -41,6 +41,8 @@ export async function POST(req: Request) {
       description: business.tagline || business.niche,
       amountCents: business.price_cents,
       currency: business.currency,
+      billing: (business.billing as 'one_time' | 'subscription') ?? 'one_time',
+      interval: (business.billing_interval as 'month') ?? 'month',
       successUrl: `${env.publicUrl}/thanks?business=${businessId}&session={CHECKOUT_SESSION_ID}`,
       cancelUrl: business.url || env.publicUrl,
     });

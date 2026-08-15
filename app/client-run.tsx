@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import Scan from './scan';
 
 /**
  * The demo control: one button that runs the whole client pipeline and shows
@@ -36,11 +37,30 @@ export default function ClientRun() {
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<RunResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pool, setPool] = useState<string[]>([]);
+  const [chosen, setChosen] = useState<{ username: string; reason?: string }[]>([]);
+  const [scanning, setScanning] = useState(false);
+
+  // The sweep streams the real network and lands on the real allowlist, so both
+  // are loaded before the button is pressed rather than invented on the fly.
+  useEffect(() => {
+    fetch('/api/cohort', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((j) => {
+        setPool((j.pool ?? []) as string[]);
+        setChosen(((j.cohort ?? []) as { username: string; note: string }[]).map((c) => ({
+          username: c.username,
+          reason: 'targetable · building something',
+        })));
+      })
+      .catch(() => {});
+  }, []);
 
   const run = async (dryRun: boolean) => {
     setRunning(true);
     setError(null);
     setResult(null);
+    if (!dryRun) setScanning(true);
     try {
       const res = await fetch('/api/demo/run', {
         method: 'POST',
@@ -84,6 +104,12 @@ export default function ClientRun() {
           </button>
         </div>
       </div>
+
+      {scanning && (
+        <div className="mt-5">
+          <Scan pool={pool} chosen={chosen} active={scanning} />
+        </div>
+      )}
 
       {error && (
         <p className="mt-4 rounded-lg border border-[var(--color-line)] bg-[var(--color-bg)] px-4 py-3 text-sm">
@@ -140,7 +166,7 @@ export default function ClientRun() {
                 <p className="mt-1 text-sm text-[var(--color-muted)]">—</p>
               )}
               <p className="mt-1 font-mono text-[11px] text-[var(--color-dim)]">
-                ${(result.segment.priceCents / 100).toFixed(2)} one-time
+                ${(result.segment.priceCents / 100).toFixed(2)}/month
               </p>
             </div>
 

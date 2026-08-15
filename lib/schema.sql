@@ -345,6 +345,14 @@ CREATE TABLE IF NOT EXISTS consent_cohort (
 -- ---------------------------------------------------------------------------
 
 ALTER TABLE businesses     ADD COLUMN IF NOT EXISTS is_fixture BOOLEAN NOT NULL DEFAULT false;
+-- Recurring billing. A $5/month product cannot fund a $100 expert out of one
+-- sale, so the hiring budget amortises that one-off cost across the first
+-- `subscriber_target` subscribers instead of testing it against a single sale.
+ALTER TABLE businesses        ADD COLUMN IF NOT EXISTS billing           TEXT    NOT NULL DEFAULT 'one_time';
+ALTER TABLE businesses        ADD COLUMN IF NOT EXISTS billing_interval  TEXT    NOT NULL DEFAULT 'month';
+ALTER TABLE businesses        ADD COLUMN IF NOT EXISTS subscriber_target INTEGER NOT NULL DEFAULT 100;
+ALTER TABLE audience_segments ADD COLUMN IF NOT EXISTS billing           TEXT    NOT NULL DEFAULT 'subscription';
+ALTER TABLE audience_segments ADD COLUMN IF NOT EXISTS subscriber_target INTEGER NOT NULL DEFAULT 100;
 -- Retired at an operator reset. Hidden from the portfolio, but its ledger and
 -- decision history stay — those tables are append-only and a reset must not be
 -- able to rewrite what was actually spent.

@@ -32,8 +32,10 @@ export class StripeCheckoutProvider implements CheckoutProvider {
   async createSession(req: CheckoutRequest): Promise<CheckoutSession> {
     const stripe = stripeClient();
 
+    const subscription = req.billing === 'subscription';
+
     const session = await stripe.checkout.sessions.create({
-      mode: 'payment',
+      mode: subscription ? 'subscription' : 'payment',
       // Explicit. Never `automatic_payment_methods` on this account.
       payment_method_types: env.stripePaymentMethodTypes as Stripe.Checkout.SessionCreateParams.PaymentMethodType[],
       line_items: [
@@ -42,6 +44,9 @@ export class StripeCheckoutProvider implements CheckoutProvider {
           price_data: {
             currency: req.currency,
             unit_amount: req.amountCents,
+            // Stripe rejects `recurring` in payment mode, so it appears only
+            // when the product actually bills on a cycle.
+            ...(subscription ? { recurring: { interval: req.interval ?? 'month' } } : {}),
             product_data: {
               name: req.productName,
               description: req.description.slice(0, 500),
@@ -53,9 +58,11 @@ export class StripeCheckoutProvider implements CheckoutProvider {
       cancel_url: req.cancelUrl,
       // Read back by the webhook to attribute revenue to the right business.
       metadata: { business_id: req.businessId, foundry: '1' },
-      payment_intent_data: {
-        metadata: { business_id: req.businessId, foundry: '1' },
-      },
+      // `payment_intent_data` is invalid in subscription mode — the
+      // subscription carries the attribution metadata instead.
+      ...(subscription
+        ? { subscription_data: { metadata: { business_id: req.businessId, foundry: '1' } } }
+        : { payment_intent_data: { metadata: { business_id: req.businessId, foundry: '1' } } }),
     });
 
     if (!session.url) throw new Error('Stripe returned a session without a URL');

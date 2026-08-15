@@ -95,6 +95,8 @@ export async function POST(req: Request) {
       deliverable: `Deliver "${segment.proposed_offer}" for a customer in: ${segment.description}`,
       expertProfile: `Practitioner with direct experience in: ${segment.keywords.join(', ')}`,
       productPriceCents: segment.price_cents,
+      billing: 'subscription' as const,
+      subscriberTarget: env.subscriberTarget,
       cycleId,
     }).catch((err) => ({
       decision: 'declined' as const,

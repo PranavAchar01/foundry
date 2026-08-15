@@ -201,8 +201,9 @@ export async function spawn(input: SpawnInput): Promise<SpawnResult> {
 
   await query(
     `INSERT INTO businesses
-       (id, slug, name, niche, tagline, hypothesis_id, url, price_cents, status, meta)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'TESTING',$9)`,
+       (id, slug, name, niche, tagline, hypothesis_id, url, price_cents, status, meta,
+        billing, billing_interval, subscriber_target)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'TESTING',$9,'subscription',$10,$11)`,
     [
       businessId, slug, hypothesis.name, input.niche, hypothesis.tagline,
       hypothesisId, deployed.url, hypothesis.priceCents,
@@ -212,6 +213,8 @@ export async function spawn(input: SpawnInput): Promise<SpawnResult> {
         pagegen: page.provider,
         bullets: hypothesis.bullets,
       }),
+      env.billingInterval,
+      env.subscriberTarget,
     ],
   );
 
