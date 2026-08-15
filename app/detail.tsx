@@ -77,6 +77,7 @@ const SITE_H = 900;
 function SiteFrame({ url, title }: { url: string; title: string }) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [scale, setScale] = useState(0);
+  const [painted, setPainted] = useState(false);
 
   useEffect(() => {
     const el = ref.current;
@@ -91,11 +92,13 @@ function SiteFrame({ url, title }: { url: string; title: string }) {
   return (
     <div ref={ref} className="relative w-full overflow-hidden bg-[var(--color-panel2)]"
          style={{ height: scale ? SITE_H * scale : 420 }}>
+      {!painted && <div className="shimmer absolute inset-0" />}
       {scale > 0 && (
         <iframe
           src={url}
           title={title}
           scrolling="no"
+          onLoad={() => setPainted(true)}
           sandbox="allow-scripts allow-same-origin"
           className="absolute top-0 left-0 origin-top-left border-0"
           style={{ width: SITE_W, height: SITE_H, transform: `scale(${scale})` }}
