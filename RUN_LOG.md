@@ -816,3 +816,56 @@ Machines: the cycle parks anything idle over 15 minutes, so a paused VM's
 preview returns 503 by design. The detail view now streams the machine's live
 stdout instead of embedding its preview, so a parked machine reads as parked
 rather than broken.
+
+## 2026-08-15 — Iteration 21 · audience intelligence, hiring economics, Linq
+
+Owner shifted the model: instead of spawning many cheap bets, read a real X
+audience, find the segments inside it worth building for, then build the
+business *and* hire the human who delivers it — priced as a share of what the
+product sells for.
+
+### The credentials, probed before anything was built
+
+- **X**: `oauth2/token` with `grant_type=client_credentials` → **403**. Those
+  are OAuth 2.0 *app* credentials; that endpoint wants the older consumer key
+  pair. Reading a following list needs **user context** anyway, which only comes
+  from the Authorization Code + PKCE redirect. So the deliverable is the flow,
+  not a stolen shortcut.
+- **Linq**: the guessed `/v1/*` paths were 404s. Real API is
+  `https://api.linqapp.com/api/partner/v3`, Bearer auth — `/phone_numbers` is a
+  real route that returned **401 `2004 invalid or expired token`**. The endpoint
+  and scheme are now correct in code; the supplied token is not valid.
+- **Terac**: `TERAC_API_KEY` still empty and the Terac MCP needs interactive
+  OAuth this session cannot run, so hiring runs on the seeded stub until a key
+  lands.
+
+### What was built
+
+- `lib/x.ts` — OAuth 2.0 PKCE: authorize, callback, token storage, automatic
+  refresh, and a paged `following()` reader. Paged on purpose: X's read quota is
+  the scarce resource and a full graph walk would spend a month of Basic tier in
+  one call.
+- `lib/audience.ts` — clustering. The model is given **bios with handles
+  withheld**, so it groups descriptions of work and is never handed the
+  identities that would let it reason about a named person.
+- `lib/hiring.ts` — the economics. `payout = price × FOUNDRY_LABOR_PAYOUT_SHARE`
+  (0.75). It quotes the marketplace, and if the quote exceeds the payout budget
+  it **declines with the arithmetic written down** — hiring that costs more than
+  the product earns is the failure this is designed to catch. Purchases post as
+  COGS to the same ledger as revenue, and still pass `authorizeSpend`.
+- Endpoints: `/api/x/login`, `/api/x/callback`, `/api/audience`,
+  `/api/audience/sync`, `/api/audience/cluster`, `/api/audience/launch`.
+- Schema: `x_accounts`, `x_oauth_states`, `audience_segments`,
+  `audience_members`, `labor_listings`.
+
+### The scope line
+
+Segments are **aggregate markets**, never dossiers. The pipeline does not build
+a profile of a named individual or design a scheme to extract money from one
+person — it finds a repeated pattern across many accounts and builds for the
+pattern. That is the defensible version and the more useful one: one person is
+a consulting gig, forty are a business.
+
+Verified live: `/api/audience` returns state, `/api/x/login` builds a correct
+S256 PKCE authorize URL with the right client id, redirect and scopes. Gate
+green — lint, typecheck, build, 41 passed / 10 skipped.

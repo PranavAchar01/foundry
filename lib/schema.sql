@@ -201,6 +201,101 @@ CREATE TABLE IF NOT EXISTS machine_runs (
 CREATE INDEX IF NOT EXISTS machine_runs_business_idx ON machine_runs (business_id, created_at DESC);
 
 -- ---------------------------------------------------------------------------
+-- Audience intelligence.
+--
+-- The portfolio model spawns cheap bets and kills the losers. This is the other
+-- direction: read a real audience, find the segments inside it that are
+-- underserved, and build for those. Segments are AGGREGATE — a segment is a
+-- market, not a dossier. Individual accounts are stored only as the membership
+-- counts and public bio keywords that produced the clustering.
+-- ---------------------------------------------------------------------------
+
+-- OAuth tokens for the connected X account. One row; refreshed in place.
+CREATE TABLE IF NOT EXISTS x_accounts (
+  id            TEXT PRIMARY KEY,
+  x_user_id     TEXT        NOT NULL,
+  username      TEXT        NOT NULL DEFAULT '',
+  access_token  TEXT        NOT NULL,
+  refresh_token TEXT        NOT NULL DEFAULT '',
+  scope         TEXT        NOT NULL DEFAULT '',
+  expires_at    TIMESTAMPTZ,
+  connected_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Short-lived PKCE verifiers, keyed by the OAuth `state`.
+CREATE TABLE IF NOT EXISTS x_oauth_states (
+  state         TEXT PRIMARY KEY,
+  code_verifier TEXT        NOT NULL,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- A cluster of the audience that shares a problem worth paying to solve.
+CREATE TABLE IF NOT EXISTS audience_segments (
+  id             TEXT PRIMARY KEY,
+  label          TEXT        NOT NULL,
+  -- What the people in this segment appear to do, in aggregate.
+  description    TEXT        NOT NULL DEFAULT '',
+  -- Signals the clustering keyed on: bio keywords, not identities.
+  keywords       TEXT[]      NOT NULL DEFAULT '{}',
+  member_count   INTEGER     NOT NULL DEFAULT 0,
+  -- 0-1: how strongly this segment looks like it would pay for something.
+  willingness    REAL        NOT NULL DEFAULT 0,
+  -- The agent's reasoning for that score, in its own words.
+  reasoning      TEXT        NOT NULL DEFAULT '',
+  -- What to sell them, and what a consultant delivering it should be paid.
+  proposed_offer TEXT        NOT NULL DEFAULT '',
+  price_cents    INTEGER     NOT NULL DEFAULT 0,
+  business_id    TEXT,
+  status         TEXT        NOT NULL DEFAULT 'IDENTIFIED'
+                  CHECK (status IN ('IDENTIFIED', 'BUILDING', 'LAUNCHED', 'DISCARDED')),
+  source         TEXT        NOT NULL DEFAULT 'x',
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS audience_segments_status_idx ON audience_segments (status);
+
+-- Raw audience rows, kept only to recompute clusters. Public profile fields
+-- only; no timelines, no DMs, no cross-source joining.
+CREATE TABLE IF NOT EXISTS audience_members (
+  id           TEXT PRIMARY KEY,
+  source       TEXT        NOT NULL DEFAULT 'x',
+  external_id  TEXT        NOT NULL,
+  username     TEXT        NOT NULL DEFAULT '',
+  bio          TEXT        NOT NULL DEFAULT '',
+  followers    INTEGER     NOT NULL DEFAULT 0,
+  segment_id   TEXT REFERENCES audience_segments (id),
+  fetched_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (source, external_id)
+);
+
+CREATE INDEX IF NOT EXISTS audience_members_segment_idx ON audience_members (segment_id);
+
+-- A unit of human expertise Foundry is hiring to deliver a segment's offer.
+CREATE TABLE IF NOT EXISTS labor_listings (
+  id                TEXT PRIMARY KEY,
+  segment_id        TEXT REFERENCES audience_segments (id),
+  business_id       TEXT,
+  provider          TEXT        NOT NULL DEFAULT 'terac',
+  role              TEXT        NOT NULL,
+  expert_profile    TEXT        NOT NULL DEFAULT '',
+  -- The economics: what the product sells for, and the share the human keeps.
+  product_price_cents INTEGER   NOT NULL DEFAULT 0,
+  payout_share      REAL        NOT NULL DEFAULT 0.75,
+  target_payout_cents INTEGER   NOT NULL DEFAULT 0,
+  quoted_cents      INTEGER,
+  quote_id          TEXT,
+  opportunity_id    TEXT,
+  decision          TEXT        NOT NULL DEFAULT 'pending',
+  reason            TEXT        NOT NULL DEFAULT '',
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  resolved_at       TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS labor_listings_segment_idx ON labor_listings (segment_id);
+
+-- ---------------------------------------------------------------------------
 -- Forward migrations for databases created by an earlier revision.
 -- ---------------------------------------------------------------------------
 
