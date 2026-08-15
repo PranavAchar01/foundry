@@ -3,8 +3,11 @@
 import { useEffect, useState } from 'react';
 
 /**
- * One company, opened. Three things and nothing else: the site it sells from,
- * the machine that runs it, and whether it is working.
+ * One company, everything at once.
+ *
+ * No tabs: the storefront, the machine running it, the traction and the agent's
+ * reasoning are all on screen together, because the whole point is seeing that
+ * they belong to the same thing.
  */
 
 interface Detail {
@@ -52,7 +55,6 @@ const clock = (iso: string) => new Date(iso).toLocaleTimeString('en-US', { hour1
 
 export default function CompanyDetail({ id, onClose }: { id: string; onClose: () => void }) {
   const [data, setData] = useState<Detail | null>(null);
-  const [tab, setTab] = useState<'site' | 'machine'>('site');
 
   useEffect(() => {
     let alive = true;
@@ -61,14 +63,13 @@ export default function CompanyDetail({ id, onClose }: { id: string; onClose: ()
       if (alive && res.ok) setData((await res.json()) as Detail);
     };
     void load();
-    const timer = setInterval(load, 6000);
+    const timer = setInterval(load, 5000);
     return () => {
       alive = false;
       clearInterval(timer);
     };
   }, [id]);
 
-  // Escape closes, and the body must not scroll behind the overlay.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     document.addEventListener('keydown', onKey);
@@ -82,39 +83,48 @@ export default function CompanyDetail({ id, onClose }: { id: string; onClose: ()
 
   const b = data?.business;
   const t = data?.traction;
+  const m = data?.machine;
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/25 p-4 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="flex h-full max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-[var(--color-line)] bg-[var(--color-bg)]"
+        className="card-shadow-lg w-full max-w-[1400px] overflow-hidden rounded-2xl border border-[var(--color-line)] bg-[var(--color-bg)]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* header */}
         <header className="flex items-start justify-between gap-4 border-b border-[var(--color-line)] px-6 py-4">
           <div className="min-w-0">
             <h2 className="truncate text-lg font-semibold">{b?.name ?? 'loading…'}</h2>
-            <p className="truncate text-sm text-[var(--color-muted)]">{b?.tagline ?? b?.niche}</p>
+            <p className="truncate text-sm text-[var(--color-muted)]">{b?.tagline || b?.niche}</p>
           </div>
-          <button
-            onClick={onClose}
-            className="shrink-0 rounded-lg border border-[var(--color-line)] px-3 py-1.5 font-mono text-xs text-[var(--color-muted)] hover:text-[var(--color-fg)]"
-          >
-            close ✕
-          </button>
+          <div className="flex shrink-0 items-center gap-3 font-mono text-[10px]">
+            {b?.url && (
+              <a href={b.url} target="_blank" rel="noreferrer" className="text-[var(--color-fg)] underline underline-offset-2 hover:text-[var(--color-muted)]">
+                site ↗
+              </a>
+            )}
+            {m?.previewUrl && (
+              <a href={m.previewUrl} target="_blank" rel="noreferrer" className="text-[var(--color-fg)] underline underline-offset-2 hover:text-[var(--color-muted)]">
+                machine ↗
+              </a>
+            )}
+            <button
+              onClick={onClose}
+              className="rounded-full border border-[var(--color-line)] bg-[var(--color-panel)] px-3.5 py-1.5 text-xs text-[var(--color-muted)] transition hover:bg-[var(--color-accdim)] hover:text-[var(--color-fg)]"
+            >
+              close ✕
+            </button>
+          </div>
         </header>
 
-        {/* the numbers, plainly */}
-        <div className="grid grid-cols-2 gap-px border-b border-[var(--color-line)] bg-[var(--color-line)] md:grid-cols-6">
+        {/* traction, plainly, across the top */}
+        <div className="grid grid-cols-3 gap-px border-b border-[var(--color-line)] bg-[var(--color-line)] md:grid-cols-6">
           <Metric label="visitors" value={t ? String(t.visitors) : '—'} />
           <Metric label="sales" value={t ? String(t.conversions) : '—'} />
-          <Metric
-            label="revenue"
-            value={t ? `$${t.revenueUsd.toFixed(2)}` : '—'}
-            tone={t && t.revenueUsd > 0 ? 'acc' : 'default'}
-          />
+          <Metric label="revenue" value={t ? `$${t.revenueUsd.toFixed(2)}` : '—'} tone={t && t.revenueUsd > 0 ? 'acc' : 'default'} />
           <Metric label="spend" value={t ? `$${t.spendUsd.toFixed(2)}` : '—'} />
           <Metric
             label="net"
@@ -124,130 +134,106 @@ export default function CompanyDetail({ id, onClose }: { id: string; onClose: ()
           <Metric label="CAC" value={t?.cacUsd == null ? '—' : `$${t.cacUsd.toFixed(2)}`} />
         </div>
 
-        {/* tabs */}
-        <div className="flex gap-1 border-b border-[var(--color-line)] px-6 pt-3">
-          {(['site', 'machine'] as const).map((k) => (
-            <button
-              key={k}
-              onClick={() => setTab(k)}
-              className={`rounded-t-lg px-4 py-2 font-mono text-[11px] tracking-wider uppercase ${
-                tab === k
-                  ? 'bg-[var(--color-panel)] text-[var(--color-acc)]'
-                  : 'text-[var(--color-dim)] hover:text-[var(--color-muted)]'
-              }`}
-            >
-              {k === 'site' ? 'the website' : 'the machine running it'}
-            </button>
-          ))}
-          <div className="ml-auto flex items-center gap-3 pb-2 font-mono text-[10px] text-[var(--color-dim)]">
-            {b?.url && (
-              <a href={b.url} target="_blank" rel="noreferrer" className="text-[var(--color-acc)] underline underline-offset-2">
-                open site ↗
-              </a>
-            )}
-            {data?.machine?.previewUrl && (
-              <a
-                href={data.machine.previewUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="text-[var(--color-acc)] underline underline-offset-2"
-              >
-                open machine ↗
-              </a>
-            )}
-          </div>
-        </div>
-
-        {/* body */}
-        <div className="min-h-0 flex-1 bg-[var(--color-panel)]">
-          {tab === 'site' ? (
-            b?.url ? (
+        {/* the website and the machine, side by side */}
+        <div className="grid gap-px bg-[var(--color-line)] lg:grid-cols-2">
+          <Pane
+            title="the website customers see"
+            sub={b?.url?.replace(/^https?:\/\//, '') ?? ''}
+            badge={b ? b.status : ''}
+          >
+            {b?.url ? (
               <iframe
                 src={b.url}
                 title={`${b.name} storefront`}
-                className="h-full w-full border-0 bg-white"
+                className="h-[420px] w-full border-0 bg-white"
                 sandbox="allow-scripts allow-same-origin"
               />
             ) : (
-              <Empty>This company has no storefront.</Empty>
-            )
-          ) : (
-            <div className="grid h-full grid-rows-2 gap-px bg-[var(--color-line)] lg:grid-cols-2 lg:grid-rows-1">
-              {/* what the machine serves */}
-              <div className="flex min-h-0 flex-col bg-[var(--color-panel)]">
-                <div className="border-b border-[var(--color-line)] px-4 py-2 font-mono text-[10px] text-[var(--color-dim)]">
-                  {data?.machine
-                    ? `${data.machine.provider} · ${data.machine.status} · $${data.machine.billedUsd.toFixed(2)} of machine time`
-                    : 'no machine'}
-                </div>
-                {data?.machine?.previewUrl ? (
-                  <iframe
-                    src={data.machine.previewUrl}
-                    title="machine view"
-                    className="min-h-0 flex-1 border-0 bg-[#08090b]"
-                    sandbox="allow-scripts allow-same-origin"
-                  />
-                ) : (
-                  <Empty>This machine is not serving a view.</Empty>
-                )}
-              </div>
+              <Empty>No storefront.</Empty>
+            )}
+          </Pane>
 
-              {/* what it has been doing */}
-              <div className="thin-scroll min-h-0 overflow-y-auto bg-[#060709] px-4 py-3 font-mono text-[11px]">
-                {(data?.runs.length ?? 0) === 0 ? (
-                  <p className="text-[var(--color-dim)]">
-                    no commands yet — the operator works this machine each cycle
-                  </p>
-                ) : (
-                  data!.runs.map((r) => (
-                    <div key={r.id} className="mb-2">
-                      <div className="flex gap-2">
-                        <span className="shrink-0 text-[var(--color-dim)]">{clock(r.created_at)}</span>
-                        <span
-                          className={`shrink-0 ${r.exit_code === 0 ? 'text-[var(--color-acc)]' : 'text-[var(--color-red)]'}`}
-                        >
-                          {r.exit_code === 0 ? '$' : `✗${r.exit_code}`}
-                        </span>
-                        <span className="break-all whitespace-pre-wrap text-[#c8cdd4]">
-                          {r.command.replace(/^cd \/root\/company && /, '')}
-                        </span>
-                      </div>
-                      {r.stdout.trim() && (
-                        <pre className="mt-1 ml-[4.2rem] max-h-24 overflow-y-auto whitespace-pre-wrap break-all text-[10.5px] text-[var(--color-muted)]">
-                          {r.stdout.trim().slice(0, 900)}
-                        </pre>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          )}
+          <Pane
+            title="the machine running the company"
+            sub={m ? `${m.provider} · ${m.status} · $${m.billedUsd.toFixed(2)} of machine time` : 'no machine'}
+            badge={m?.status ?? ''}
+          >
+            {m?.previewUrl ? (
+              <iframe
+                src={m.previewUrl}
+                title="machine view"
+                className="h-[420px] w-full border-0 bg-white"
+                sandbox="allow-scripts allow-same-origin"
+              />
+            ) : (
+              <Empty>
+                {m
+                  ? 'This machine is not serving a view right now. It heals on the next cycle.'
+                  : 'No machine attached to this company.'}
+              </Empty>
+            )}
+          </Pane>
         </div>
 
-        {/* what the agent decided */}
-        <footer className="thin-scroll max-h-32 shrink-0 overflow-y-auto border-t border-[var(--color-line)] px-6 py-3">
-          {(data?.decisions.length ?? 0) === 0 ? (
-            <p className="font-mono text-[11px] text-[var(--color-dim)]">no decisions recorded yet</p>
-          ) : (
-            data!.decisions.slice(0, 4).map((d) => (
-              <p key={d.id} className="mb-1.5 text-[12px] leading-relaxed text-[#c8cdd4]">
-                <span className="font-mono text-[10px] text-[var(--color-dim)]">
-                  {clock(d.created_at)} {d.action}{' '}
-                </span>
-                {d.reasoning.slice(0, 260)}
-              </p>
-            ))
-          )}
-        </footer>
+        {/* what the machine has been doing, and what the agent concluded */}
+        <div className="grid gap-px border-t border-[var(--color-line)] bg-[var(--color-line)] lg:grid-cols-2">
+          <div className="bg-[var(--color-panel2)]">
+            <PaneTitle>machine shell</PaneTitle>
+            <div className="thin-scroll max-h-56 overflow-y-auto px-4 pb-3 font-mono text-[11px]">
+              {(data?.runs.length ?? 0) === 0 ? (
+                <p className="text-[var(--color-dim)]">
+                  no commands yet — the operator works this machine each cycle
+                </p>
+              ) : (
+                data!.runs.map((r) => (
+                  <div key={r.id} className="mb-2">
+                    <div className="flex gap-2">
+                      <span className="shrink-0 text-[var(--color-dim)]">{clock(r.created_at)}</span>
+                      <span className={`shrink-0 ${r.exit_code === 0 ? 'text-[var(--color-dim)]' : 'text-[var(--color-fg)] font-semibold'}`}>
+                        {r.exit_code === 0 ? '$' : `✗${r.exit_code}`}
+                      </span>
+                      <span className="break-all whitespace-pre-wrap text-[var(--color-fg)]">
+                        {r.command.replace(/^cd \/root\/company && /, '')}
+                      </span>
+                    </div>
+                    {r.stdout.trim() && (
+                      <pre className="mt-1 ml-[4.2rem] max-h-20 overflow-y-auto whitespace-pre-wrap break-all text-[10.5px] text-[var(--color-muted)]">
+                        {r.stdout.trim().slice(0, 700)}
+                      </pre>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="bg-[var(--color-panel)]">
+            <PaneTitle>what the agent decided</PaneTitle>
+            <div className="thin-scroll max-h-56 overflow-y-auto px-4 pb-3">
+              {(data?.decisions.length ?? 0) === 0 ? (
+                <p className="font-mono text-[11px] text-[var(--color-dim)]">nothing recorded yet</p>
+              ) : (
+                data!.decisions.map((d) => (
+                  <p key={d.id} className="mb-2 text-[12px] leading-relaxed text-[var(--color-fg)]">
+                    <span className="font-mono text-[10px] text-[var(--color-dim)]">
+                      {clock(d.created_at)}{' '}
+                    </span>
+                    <span className="font-mono text-[10px] font-medium text-[var(--color-fg)]">{d.action} </span>
+                    {d.reasoning.slice(0, 400)}
+                  </p>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
 const TONE: Record<string, string> = {
-  acc: 'text-[var(--color-acc)]',
-  red: 'text-[var(--color-red)]',
+  acc: 'text-[var(--color-fg)] font-medium',
+  red: 'text-[var(--color-muted)]',
   default: 'text-[var(--color-fg)]',
 };
 
@@ -260,9 +246,48 @@ function Metric({ label, value, tone = 'default' }: { label: string; value: stri
   );
 }
 
+function PaneTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="px-4 py-2 font-mono text-[10px] tracking-wider text-[var(--color-muted)] uppercase">
+      {children}
+    </p>
+  );
+}
+
+function Pane({
+  title,
+  sub,
+  badge,
+  children,
+}: {
+  title: string;
+  sub: string;
+  badge: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="bg-[var(--color-panel)]">
+      <div className="flex items-center justify-between gap-3 px-4 py-2">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] tracking-wider text-[var(--color-muted)] uppercase">
+            {title}
+          </p>
+          <p className="truncate font-mono text-[10px] text-[var(--color-dim)]">{sub}</p>
+        </div>
+        {badge && (
+          <span className="shrink-0 rounded-full border border-[var(--color-line)] px-2 py-0.5 font-mono text-[9px] tracking-wider text-[var(--color-muted)]">
+            {badge}
+          </span>
+        )}
+      </div>
+      {children}
+    </section>
+  );
+}
+
 function Empty({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex h-full items-center justify-center p-8 text-center text-sm text-[var(--color-dim)]">
+    <div className="flex h-[420px] items-center justify-center p-8 text-center text-sm text-[var(--color-dim)]">
       {children}
     </div>
   );

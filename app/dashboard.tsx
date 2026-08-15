@@ -64,9 +64,10 @@ interface MachineLite {
 const usd = (cents: number | string) => `$${(Math.abs(Number(cents)) / 100).toFixed(2)}`;
 
 const STATUS: Record<Card['status'], string> = {
-  SCALING: 'border-[var(--color-accdim)] bg-[#0d2417] text-[var(--color-acc)]',
-  TESTING: 'border-[#3f3312] bg-[#241c07] text-[var(--color-amber)]',
-  KILLED: 'border-[#3f1d1d] bg-[#240d0d] text-[var(--color-red)]',
+  // Solid = earning, outline = still being tested, flat grey = dead.
+  SCALING: 'border-transparent bg-[var(--color-fg)] text-white',
+  TESTING: 'border-[var(--color-fg)] bg-white/85 text-[var(--color-fg)]',
+  KILLED: 'border-transparent bg-[var(--color-accdim)] text-[var(--color-muted)]',
 };
 
 export default function Dashboard() {
@@ -151,7 +152,7 @@ export default function Dashboard() {
           <span className="flex items-center gap-2 text-[11px] text-[var(--color-dim)]">
             <span
               className={`inline-block h-1.5 w-1.5 rounded-full ${
-                connected ? 'bg-[var(--color-acc)] pulse' : 'bg-[var(--color-dim)]'
+                connected ? 'bg-[var(--color-fg)] pulse' : 'bg-[var(--color-dim)]'
               }`}
             />
             {connected ? 'live' : 'reconnecting'}
@@ -160,17 +161,17 @@ export default function Dashboard() {
       </header>
 
       {budget.breaker.tripped && (
-        <div className="mb-6 rounded-xl border border-[#3f1d1d] bg-[#180b0b] px-5 py-3">
-          <span className="font-mono text-[11px] tracking-wider text-[var(--color-red)] uppercase">
+        <div className="mb-6 rounded-2xl border border-[var(--color-fg)] bg-[var(--color-fg)] px-5 py-3">
+          <span className="font-mono text-[11px] tracking-wider text-white uppercase">
             circuit breaker tripped
           </span>
-          <span className="ml-3 text-sm text-[var(--color-fg)]">{budget.breaker.reason}</span>
+          <span className="ml-3 text-sm text-white/80">{budget.breaker.reason}</span>
         </div>
       )}
 
       {/* ---- the wall of companies ---- */}
       {data.businesses.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-[var(--color-line)] px-6 py-16 text-center text-sm text-[var(--color-dim)]">
+        <p className="rounded-2xl border border-dashed border-[var(--color-line)] px-6 py-16 text-center text-sm text-[var(--color-dim)]">
           No companies yet. The next CEO cycle will spawn one.
         </p>
       ) : (
@@ -181,10 +182,10 @@ export default function Dashboard() {
               <button
                 key={b.id}
                 onClick={() => setOpen(b.id)}
-                className="group overflow-hidden rounded-xl border border-[var(--color-line)] bg-[var(--color-panel)] text-left transition hover:border-[#2c333c] hover:shadow-[0_0_0_1px_rgba(74,222,128,0.12)]"
+                className="group card-shadow card-hover overflow-hidden rounded-2xl border border-[var(--color-line)] bg-[var(--color-panel)] text-left"
               >
                 {/* the company's actual hero page */}
-                <div className="relative h-44 overflow-hidden border-b border-[var(--color-line)] bg-[#0b0c0f]">
+                <div className="relative h-44 overflow-hidden border-b border-[var(--color-line)] bg-[var(--color-panel2)]">
                   {b.url ? (
                     <iframe
                       src={b.url}
@@ -202,7 +203,7 @@ export default function Dashboard() {
                     </div>
                   )}
                   {b.status === 'KILLED' && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/70 font-mono text-[11px] tracking-widest text-[var(--color-red)]">
+                    <div className="absolute inset-0 flex items-center justify-center bg-white/70 text-[11px] font-medium tracking-[0.18em] text-[var(--color-muted)] backdrop-blur-[2px]">
                       KILLED
                     </div>
                   )}
@@ -212,8 +213,8 @@ export default function Dashboard() {
                     {b.status}
                   </span>
                   {m && (
-                    <span className="absolute bottom-2 left-2 rounded-full border border-[var(--color-line)] bg-black/70 px-2 py-0.5 font-mono text-[9px] text-[var(--color-muted)]">
-                      {m.status === 'active' ? <span className="pulse text-[var(--color-acc)]">● </span> : '○ '}
+                    <span className="absolute bottom-2 left-2 rounded-full border border-[var(--color-line)] bg-white/90 px-2 py-0.5 font-mono text-[9px] text-[var(--color-muted)] backdrop-blur-sm">
+                      {m.status === 'active' ? <span className="pulse text-[var(--color-fg)]">● </span> : '○ '}
                       VM {m.status}
                     </span>
                   )}
@@ -245,8 +246,8 @@ export default function Dashboard() {
           <span className="shrink-0 tracking-wider text-[var(--color-muted)] uppercase">latest</span>
           {latest ? (
             <p className="line-clamp-2 text-[var(--color-dim)]">
-              <span className="text-[var(--color-acc)]">{latest.action}</span>{' '}
-              <span className="text-[#c8cdd4]">{latest.reasoning.slice(0, 260)}</span>{' '}
+              <span className="font-medium text-[var(--color-fg)]">{latest.action}</span>{' '}
+              <span className="text-[var(--color-muted)]">{latest.reasoning.slice(0, 260)}</span>{' '}
               <span>· {latest.model}</span>
             </p>
           ) : (
@@ -264,8 +265,8 @@ export default function Dashboard() {
 }
 
 const TONE: Record<string, string> = {
-  acc: 'text-[var(--color-acc)]',
-  red: 'text-[var(--color-red)]',
+  acc: 'text-[var(--color-fg)] font-medium',
+  red: 'text-[var(--color-muted)]',
   muted: 'text-[var(--color-muted)]',
   default: 'text-[var(--color-fg)]',
 };

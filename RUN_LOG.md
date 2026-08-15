@@ -626,3 +626,43 @@ the counters reset to zero — the four live companies now read a truthful
 
 Portfolio after the reset: 4 companies, each with its own machine, spawned in
 11–14s. Gate: lint clean, typecheck clean, build clean, 41 passed / 10 skipped.
+
+## 2026-08-15 — Iteration 19 · the VMs were dying quietly
+
+Owner reported none of the VM views loaded. 3 of 4 previews were 502 — and each
+had logged `serve.pl on :8000 -> 200` at boot. So they came up and then died.
+
+Root cause, from the SDK's own types: `commands.spawn` binds the process to the
+SDK connection — "Abort to kill the process and close the connection". The perl
+server was therefore reaped the moment provisioning disconnected. Boot looked
+healthy because the probe ran while the connection was still open.
+
+Fix: launch detached instead —
+
+    setsid nohup perl serve.pl … </dev/null >serve.log 2>&1 &
+
+`setsid` leaves the session, `nohup` survives the hangup, the redirects free the
+shell so `run()` returns immediately. Proved on a live 502 machine: 200 from
+inside, then 200 from the outside *after* the SDK connection closed. Applied to
+both provisioning and `ensureServing`, then healed the fleet — **4/4 previews
+serving**.
+
+### Detail view: everything on one page
+
+Tabs removed. Opening a company now shows, at once: six traction metrics across
+the top, the storefront and the machine's own view side by side, and beneath
+them the machine's shell and the agent's reasoning. Verified in the browser.
+
+### Test data was leaking into the live feed
+
+The footer ticker was showing an `ESCALATION_PURCHASED` from the labor-swap test
+fixture. Fixture and archived companies write real decision rows — they must,
+the table is append-only — but they are not the running portfolio. `recent()`
+and the SSE `since()` query now exclude them.
+
+### Still blocked
+
+`LOVABLE_API_KEY` is empty, so the rewritten hero brief remains unverified and
+the Vercel storefronts cannot be replaced with Lovable-hosted ones. Deleting the
+Vercel sites first would leave every company with no storefront at all, so that
+step waits on the key.

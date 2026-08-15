@@ -165,7 +165,7 @@ export async function provision(spec: ProvisionSpec): Promise<ProvisionResult> {
   const bootLog: string[] = [];
   try {
     await box.commands.run('chmod +x /root/company/serve.pl');
-    await box.commands.spawn('perl /root/company/serve.pl /root/company 8000');
+    await box.commands.run(LAUNCH_SERVER);
     await new Promise((r) => setTimeout(r, 1200));
     await box.publishPreviewPort(8000, { access: 'public' });
     previewUrl = box.getPreviewUrl(8000);
@@ -231,6 +231,19 @@ export async function provision(spec: ProvisionSpec): Promise<ProvisionResult> {
  * visible: publish port 8000 and the company's working directory becomes a
  * live web page that changes as its operator agent works.
  */
+/**
+ * `commands.spawn` binds a process to the SDK connection — the docs are explicit
+ * that aborting it "kills the process and closes the connection" — so a server
+ * started that way dies the moment provisioning disconnects. That is why
+ * machines booted fine and then served 502s minutes later.
+ *
+ * `setsid` detaches from the session, `nohup` survives the hangup, and the
+ * redirects free the shell so `run()` returns immediately.
+ */
+const LAUNCH_SERVER =
+  'setsid nohup perl /root/company/serve.pl /root/company 8000 ' +
+  '</dev/null >/root/company/serve.log 2>&1 & echo launched';
+
 const SERVE_PL = String.raw`#!/usr/bin/perl
 use strict; use warnings;
 use IO::Socket::INET;
@@ -280,9 +293,13 @@ while (my $c = $sock->accept) {
       my $items = listing($target, $rel);
       send_res($c, '200 OK', 'text/html',
         "<!doctype html><meta charset=utf-8><title>machine</title>"
-        . "<style>body{background:#08090b;color:#e8eaed;font:14px ui-monospace,Menlo,monospace;padding:32px}"
-        . "a{color:#4ade80;text-decoration:none}a:hover{text-decoration:underline}"
-        . "li{margin:4px 0;list-style:none}span{color:#5c636d;margin-left:8px}h1{font-size:15px;color:#8b929c}</style>"
+        . "<style>body{background:#fff;color:#1d1d1f;padding:40px;max-width:720px;margin:0 auto;"
+        . "font:15px/1.5 -apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue',Helvetica,Arial,sans-serif;"
+        . "letter-spacing:-.01em;-webkit-font-smoothing:antialiased}"
+        . "a{color:#1d1d1f;text-decoration:none;font-weight:500}a:hover{text-decoration:underline}"
+        . "li{padding:11px 0;border-bottom:1px solid #d2d2d7;list-style:none}"
+        . "span{color:#86868b;margin-left:8px;font-size:13px}"
+        . "h1{font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#86868b;margin-bottom:14px}</style>"
         . "<h1>$path</h1><ul>$items</ul>");
     }
   } elsif (-f $target) {
@@ -325,25 +342,39 @@ function bootPage(spec: ProvisionSpec): string {
   const esc = (s: string) =>
     s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   return `<!doctype html><meta charset="utf-8"><title>${esc(spec.name)} — machine</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
- body{background:#08090b;color:#e8eaed;font:14px/1.6 ui-monospace,Menlo,monospace;padding:40px;max-width:760px;margin:0 auto}
- h1{font-size:19px;margin:0 0 4px} .m{color:#5c636d} .a{color:#4ade80}
- ul{padding-left:18px;margin:14px 0} li{margin:3px 0}
- .box{border:1px solid #1e2228;border-radius:10px;padding:18px;margin-top:22px;background:#0e1014}
+ :root{--bg:#fff;--grey:#f5f5f7;--line:#d2d2d7;--fg:#1d1d1f;--muted:#6e6e73;--dim:#86868b}
+ *{box-sizing:border-box;margin:0;padding:0}
+ body{background:var(--bg);color:var(--fg);letter-spacing:-.01em;line-height:1.5;
+   font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue",Helvetica,Arial,sans-serif;
+   -webkit-font-smoothing:antialiased;padding:56px 28px;max-width:760px;margin:0 auto}
+ h1{font-size:34px;font-weight:600;letter-spacing:-.03em;margin-bottom:6px}
+ .sub{color:var(--muted);font-size:15px;margin-bottom:34px}
+ .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--fg);margin-right:7px}
+ .box{background:var(--grey);border:1px solid var(--line);border-radius:16px;padding:24px}
+ h2{font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--dim);margin-bottom:14px}
+ ul{list-style:none}
+ li{padding:12px 0;border-bottom:1px solid var(--line);font-size:15px}
+ li:last-child{border-bottom:0}
+ a{color:var(--fg);text-decoration:none;font-weight:500}
+ a:hover{text-decoration:underline}
+ .note{margin-top:16px;color:var(--muted);font-size:13.5px;line-height:1.6}
+ .disclosure{margin-top:26px;font-size:12.5px;color:var(--dim)}
 </style>
 <h1>${esc(spec.name)}</h1>
-<div class="m">${esc(spec.niche)} · machine online</div>
+<div class="sub"><span class="dot"></span>${esc(spec.niche)} · machine online</div>
 <div class="box">
-  <div class="a">operator workspace</div>
+  <h2>Operator workspace</h2>
   <ul>
-    <li><a class="a" href="/COMPANY.md">COMPANY.md</a> — the brief</li>
-    <li><a class="a" href="/NOTES.md">NOTES.md</a> — durable findings</li>
-    <li><a class="a" href="/company.json">company.json</a></li>
+    <li><a href="/COMPANY.md">COMPANY.md</a> — the brief</li>
+    <li><a href="/NOTES.md">NOTES.md</a> — durable findings</li>
+    <li><a href="/company.json">company.json</a></li>
   </ul>
-  <div class="m">This page is served by the machine itself. The operator agent may
-  replace it as it works — what you see here is whatever it has built so far.</div>
+  <p class="note">This page is served by the machine itself. The operator agent may
+  replace it as it works — what you see here is whatever it has built so far.</p>
 </div>
-<p class="m">${esc(spec.disclosureLine ?? env.disclosureLine)}</p>
+<p class="disclosure">${esc(spec.disclosureLine ?? env.disclosureLine)}</p>
 `;
 }
 
@@ -358,7 +389,7 @@ function bootPage(spec: ProvisionSpec): string {
  * machine does not silently start serving 502s.
  */
 export async function ensureServing(
-  box: { commands: { run: (c: string, o?: { timeoutMs?: number }) => Promise<{ stdout?: string }>; spawn: (c: string) => Promise<unknown> } },
+  box: { commands: { run: (c: string, o?: { timeoutMs?: number }) => Promise<{ stdout?: string }> } },
   machineRow: MachineRow,
 ): Promise<boolean> {
   const probe = await box.commands
@@ -367,7 +398,7 @@ export async function ensureServing(
 
   if ((probe.stdout ?? '').trim() === '200') return true;
 
-  await box.commands.spawn('perl /root/company/serve.pl /root/company 8000').catch(() => {});
+  await box.commands.run(LAUNCH_SERVER).catch(() => {});
   await new Promise((r) => setTimeout(r, 1200));
 
   const again = await box.commands
