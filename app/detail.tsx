@@ -37,18 +37,15 @@ interface Detail {
     createdAt: string;
     pagegen: string;
   };
+  /*
+   * The endpoint still returns the P&L; this view no longer shows it, so the
+   * shape declares only what is read. Money stays on the ledger, which is
+   * append-only, rather than on screen.
+   */
   traction: {
     visitors: number;
     conversions: number;
     conversionRate: number;
-    revenueUsd: number;
-    cogsUsd: number;
-    opexUsd: number;
-    spendUsd: number;
-    netUsd: number;
-    cacUsd: number | null;
-    priceUsd: number;
-    budgetUsd: number;
   };
   machine: {
     id: string;
@@ -264,17 +261,9 @@ export default function CompanyDetail({
         )}
 
         {/* traction, plainly, across the top */}
-        <div className="grid grid-cols-3 gap-px border-b border-[var(--color-line)] bg-[var(--color-line)] md:grid-cols-6">
+        <div className="grid grid-cols-2 gap-px border-b border-[var(--color-line)] bg-[var(--color-line)]">
           <Metric label="visitors" value={t ? String(t.visitors) : '—'} />
           <Metric label="sales" value={t ? String(t.conversions) : '—'} />
-          <Metric label="revenue" value={t ? `$${t.revenueUsd.toFixed(2)}` : '—'} tone={t && t.revenueUsd > 0 ? 'acc' : 'default'} />
-          <Metric label="spend" value={t ? `$${t.spendUsd.toFixed(2)}` : '—'} />
-          <Metric
-            label="net"
-            value={t ? `${t.netUsd < 0 ? '−' : ''}$${Math.abs(t.netUsd).toFixed(2)}` : '—'}
-            tone={t && t.netUsd >= 0 ? 'acc' : 'red'}
-          />
-          <Metric label="CAC" value={t?.cacUsd == null ? '—' : `$${t.cacUsd.toFixed(2)}`} />
         </div>
 
         {/* the website and the machine, side by side */}
@@ -293,7 +282,7 @@ export default function CompanyDetail({
 
           <Pane
             title="the machine running the company · live"
-            sub={m ? `${m.externalId.slice(0, 8)} · ${m.provider} · ${m.status} · $${m.billedUsd.toFixed(2)} of machine time` : 'no machine'}
+            sub={m ? `${m.externalId.slice(0, 8)} · ${m.provider} · ${m.status}` : 'no machine'}
             badge={m?.status ?? ''}
           >
             {m ? (

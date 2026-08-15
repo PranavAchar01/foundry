@@ -511,7 +511,6 @@ export default function ClientRun({ onPeople, onSettled }: Props) {
                       <>
                         <span className="text-[var(--color-acc)]">listing posted</span>
                         {p.hire.opportunityId && ` · ${p.hire.opportunityId}`}
-                        {` · budget $${(p.hire.targetPayoutCents / 100).toFixed(2)}`}
                       </>
                     ) : (
                       <>no listing — {p.hire.reason}</>
