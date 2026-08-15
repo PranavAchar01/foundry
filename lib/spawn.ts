@@ -320,9 +320,9 @@ async function uniqueSlug(base: string): Promise<string> {
  * ones forward. It redeploys to the same project, so each business keeps its
  * URL and nothing in the database changes.
  */
-export async function restyleAll(): Promise<
-  { businessId: string; name: string; ok: boolean; detail: string }[]
-> {
+export async function restyleAll(
+  opts: { onlyBroken?: boolean } = {},
+): Promise<{ businessId: string; name: string; ok: boolean; detail: string }[]> {
   const live = await businesses.live();
   const pagegen = pagegenProvider();
   const host = hostProvider();
@@ -330,6 +330,18 @@ export async function restyleAll(): Promise<
 
   for (const b of live) {
     try {
+      // Default to repairing only what is actually broken. Rebuilding a healthy
+      // storefront costs a provider build and can churn a working site.
+      if (opts.onlyBroken !== false) {
+        const reachable = await fetch(b.url, { signal: AbortSignal.timeout(8000) })
+          .then((r) => r.ok)
+          .catch(() => false);
+        if (reachable) {
+          out.push({ businessId: b.id, name: b.name, ok: true, detail: 'already serving, left alone' });
+          continue;
+        }
+      }
+
       const meta = b.meta as { bullets?: string[] };
       const page = await pagegen.generate({
         businessId: b.id,
@@ -346,9 +358,21 @@ export async function restyleAll(): Promise<
         disclosure: env.disclosureLine,
       });
 
-      // A provider that hosts its own site has nothing to redeploy here.
+      // A provider that hosts the site itself gives back a new URL. That URL is
+      // now the business's storefront, so it must be persisted — otherwise the
+      // record keeps pointing at whatever it was hosted on before, which may no
+      // longer exist.
       if (page.hostedUrl) {
-        out.push({ businessId: b.id, name: b.name, ok: true, detail: `hosted by ${page.provider}, left alone` });
+        await query(`UPDATE businesses SET url = $2, updated_at = now() WHERE id = $1`, [
+          b.id,
+          page.hostedUrl,
+        ]);
+        out.push({
+          businessId: b.id,
+          name: b.name,
+          ok: true,
+          detail: `rebuilt and rehosted by ${page.provider}: ${page.hostedUrl}`,
+        });
         continue;
       }
 
@@ -356,6 +380,9 @@ export async function restyleAll(): Promise<
         slug: b.slug,
         files: [{ path: 'index.html', content: page.html }],
       });
+      if (deployed.url && deployed.url !== b.url) {
+        await query(`UPDATE businesses SET url = $2, updated_at = now() WHERE id = $1`, [b.id, deployed.url]);
+      }
       out.push({
         businessId: b.id,
         name: b.name,

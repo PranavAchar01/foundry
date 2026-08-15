@@ -22,7 +22,9 @@ export async function POST(req: Request) {
     }
   }
   try {
-    const results = await restyleAll();
+    // Default is repair-only. `?all=1` forces every storefront to be rebuilt.
+    const all = new URL(req.url).searchParams.get('all') === '1';
+    const results = await restyleAll({ onlyBroken: !all });
     return json({ restyled: results.filter((r) => r.ok).length, total: results.length, results });
   } catch (err) {
     return json({ error: errorMessage(err) }, { status: 500 });

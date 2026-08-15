@@ -728,3 +728,34 @@ Two deliberate constraints:
 
 Gate: lint clean, typecheck clean, build clean, 41 passed / 10 skipped.
 7 companies, all tiles on the new template, machine consoles live.
+
+## 2026-08-15 — Iteration 20 · a race with a second agent, and the repair
+
+Pushing the black-and-white work was rejected: a second session had pushed to
+`main` in the meantime, touching the same UI files. Rebased rather than forced,
+and it applied cleanly — the two sessions had independently converged on the
+same Apple palette, so their opengraph card was already using
+`#1d1d1f/#6e6e73/#86868b/#d2d2d7/#f5f5f7`. Their shimmer, disclosure line and
+unfurl card now sit on top of this palette; nothing was lost either way.
+
+Their work also switched `FOUNDRY_PAGEGEN_PROVIDER` to **lovable**, rehosted six
+businesses onto `*.lovable.app`, and deleted the old `foundry-biz-*` Vercel
+projects. That exposed a real bug in the `restyleAll()` I had written an hour
+earlier:
+
+- it **skipped** any provider that hosts its own site, and
+- it never persisted a changed URL.
+
+So the one business that had not been migrated — Program Block Builder — was
+left pointing at a Vercel project that no longer existed. `pnpm smoke` caught it
+as a 404 storefront.
+
+Fixed both properties:
+- a hosted provider's returned `hostedUrl` is now **written back** to
+  `businesses.url`, because that URL *is* the storefront from then on;
+- restyle now defaults to **repair-only**: it checks each storefront and skips
+  the ones already serving, so it cannot churn another agent's working sites.
+  `?all=1` forces a full rebuild.
+
+Ran repair-only: 6 left alone, 1 repaired. All 7 storefronts serve 200 and
+`pnpm smoke` is back to green.
