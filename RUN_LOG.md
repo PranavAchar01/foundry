@@ -176,3 +176,25 @@ Vercel will not serve the app yet, so everything was verified against
   outright), so `vercel.json` keeps a daily native cron and this workflow
   provides the 5-minute cadence today. On Pro, change one line in `vercel.json`.
 - Repository secrets set for both workflows.
+
+## 2026-08-15 — Iteration 10 · CI green, final state
+
+- CI run `31867588174` — **success** in 1m27s: lint, typecheck, build, the
+  no-dependency suite, and the integration suite (repository secrets are set, so
+  it ran against the real Neon database and the real Stripe signing secret).
+  The first two runs failed on `pnpm/action-setup` receiving both a `version:`
+  input and `packageManager` in `package.json`; fixed by removing the input.
+- Final local gate: `pnpm lint` clean · `pnpm typecheck` clean · `pnpm build`
+  clean · `pnpm test` **30 passed, 1 skipped** (the skip is `spawn-timing`,
+  which is opt-in because it spends real money and deploys a real business).
+- Deleted the three throwaway Vercel projects the deployment diagnosis created
+  (`foundry-app-probe`, `appprobe`, `foundry-probe-*`). Remaining Foundry
+  projects: `foundry-biz` and the two real spawned businesses.
+- `https://foundry-biz.vercel.app` currently serves the placeholder from a
+  deployment that predates this build. The domain resolves; only deployments
+  containing serverless functions are refused. One dashboard action by the
+  account owner, then `pnpm deploy && pnpm smoke` finishes it.
+
+**State at hand-off:** 10 of 11 targets verified end to end. Target 1 is
+complete in code and blocked at the last inch by Vercel account verification —
+diagnosed to the exact `blockCode`, not guessed at.
