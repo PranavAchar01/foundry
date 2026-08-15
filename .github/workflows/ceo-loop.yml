@@ -42,9 +42,9 @@ jobs:
             exit 1
           fi
 
-          URL="$BASE/api/cron/ceo"
+          URL="$BASE/api/cron/ceo?spawn=0"
           if [ -n "$NICHE" ]; then
-            URL="$URL?niche=$(printf '%s' "$NICHE" | jq -sRr @uri)"
+            URL="$URL&niche=$(printf '%s' "$NICHE" | jq -sRr @uri)"
           fi
 
           echo "POST $URL"

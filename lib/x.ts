@@ -216,7 +216,26 @@ export async function following(maxResults = 100, paginationToken?: string): Pro
   if (!acct) return { profiles: [], nextToken: null, error: 'no X account connected' };
 
   const token = await accessToken();
-  const url = new URL(`${API}/2/users/${acct.x_user_id}/following`);
+
+  /*
+   * Read the network we were pointed at, not the one that authorized. The
+   * Foundry account holds the tokens and does the following and the messaging,
+   * but the network worth segmenting belongs to X_AUDIENCE_HANDLE. Reading
+   * another account's public following list is permitted with user context.
+   */
+  let sourceId = acct.x_user_id;
+  if (env.xAudienceHandle) {
+    const target = await lookupByUsername(env.xAudienceHandle).catch(() => null);
+    if (!target) {
+      return {
+        profiles: [], nextToken: null,
+        error: `could not resolve X_AUDIENCE_HANDLE @${env.xAudienceHandle}`,
+      };
+    }
+    sourceId = target.id;
+  }
+
+  const url = new URL(`${API}/2/users/${sourceId}/following`);
   url.searchParams.set('max_results', String(Math.min(maxResults, 1000)));
   url.searchParams.set('user.fields', 'description,public_metrics,username,name');
   if (paginationToken) url.searchParams.set('pagination_token', paginationToken);

@@ -17,6 +17,9 @@ export interface BusinessRow {
   conversions: number;
   is_fixture: boolean;
   archived: boolean;
+  billing: 'one_time' | 'subscription';
+  billing_interval: string;
+  subscriber_target: number;
   kill_reason: string | null;
   killed_at: string | null;
   meta: Record<string, unknown>;
