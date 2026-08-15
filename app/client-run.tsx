@@ -42,6 +42,14 @@ export interface RunTarget {
 export type BuildState = 'queued' | 'building' | 'live' | 'failed';
 export type DmState = 'waiting' | 'sending' | 'sent' | 'failed' | 'skipped';
 
+export interface HireOutcome {
+  decision: string;
+  reason: string;
+  opportunityId: string | null;
+  targetPayoutCents: number;
+  quotedCents: number | null;
+}
+
 export interface RunPerson {
   target: RunTarget;
   build: BuildState;
@@ -50,6 +58,7 @@ export interface RunPerson {
   url: string | null;
   buildMs: number;
   message: string | null;
+  hire: HireOutcome | null;
   followed: boolean;
   buildError: string | null;
   dmError: string | null;
@@ -68,6 +77,8 @@ interface BuildResponse {
   url: string | null;
   /** Written at build time so it can be read before it is sent. */
   message: string | null;
+  /** The Terac listing posted alongside the storefront. Null when none was. */
+  hire: HireOutcome | null;
   ms: number;
   error: string | null;
 }
@@ -264,6 +275,7 @@ export default function ClientRun({ onPeople, onSettled }: Props) {
             url: j.url,
             buildMs: j.ms,
             message: j.message,
+            hire: j.hire,
           });
           onSettled();
         } catch (err) {
@@ -343,6 +355,7 @@ export default function ClientRun({ onPeople, onSettled }: Props) {
             url: null,
             buildMs: 0,
             message: null,
+            hire: null,
             followed: false,
             buildError: null,
             dmError: null,
@@ -481,6 +494,27 @@ export default function ClientRun({ onPeople, onSettled }: Props) {
                 {p.message && (
                   <p className="mt-1.5 text-[13px] leading-relaxed whitespace-pre-line text-[var(--color-muted)]">
                     {p.message}
+                  </p>
+                )}
+                {/*
+                  The listing is the other half of the product: a subscription
+                  that owes its buyer expert time every month is only real if
+                  the work was actually posted. Shown per person because it is
+                  posted per storefront, and shown with its reason when it was
+                  declined so the margin call is legible rather than hidden.
+                */}
+                {p.hire && (
+                  <p className="mt-1.5 font-mono text-[10.5px] text-[var(--color-dim)]">
+                    terac ·{' '}
+                    {p.hire.decision === 'posted' ? (
+                      <>
+                        <span className="text-[var(--color-acc)]">listing posted</span>
+                        {p.hire.opportunityId && ` · ${p.hire.opportunityId}`}
+                        {` · budget $${(p.hire.targetPayoutCents / 100).toFixed(2)}`}
+                      </>
+                    ) : (
+                      <>no listing — {p.hire.reason}</>
+                    )}
                   </p>
                 )}
               </div>

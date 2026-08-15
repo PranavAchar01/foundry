@@ -64,6 +64,27 @@ describe('lovable brief', () => {
     expect(brief).toContain(SPEC.targetCustomer);
     for (const bullet of SPEC.bullets) expect(brief).toContain(bullet);
   });
+
+  /*
+   * A run builds eight of these in the same minute. What stops them coming back
+   * as eight variants of one page is the buyer block — so it has to appear when
+   * the business was built for a named person, and stay out of the way when it
+   * was built for a segment and there is nobody to write to.
+   */
+  it('writes to the named buyer when the business is one person\'s', () => {
+    const personal = lovableBrief({
+      ...SPEC,
+      prospectBio: 'DP + operator. Commercials, music videos. Own an FX9. NYC.',
+      prospectChore: 'Rebuilding tomorrow\'s call sheet by hand every night after wrap.',
+    });
+    expect(personal).toContain('THE BUYER');
+    expect(personal).toContain('Own an FX9');
+    expect(personal).toContain('call sheet by hand every night after wrap');
+  });
+
+  it('omits the buyer block entirely on the segment path', () => {
+    expect(brief).not.toContain('THE BUYER');
+  });
 });
 
 describe('lovable provider', () => {
