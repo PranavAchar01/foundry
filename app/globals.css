@@ -1,27 +1,29 @@
 @import 'tailwindcss';
 
 /*
- * Black and white, Apple-flavoured.
+ * Dusk. The palette of the hero painting: a vast violet slope at last light.
  *
- * No hue anywhere: emphasis comes from weight, fill and space instead of
- * colour. `--color-acc` is simply near-black, so anything previously
- * "accented" now reads as *primary* rather than green. Status is carried by
- * fill (solid = scaling, outline = testing, flat grey = killed), which keeps
- * the whole thing legible in greyscale and, incidentally, colour-blind safe.
+ * Ground is plum, never black — the scene stays luminous. Type is pale peach.
+ * The single point of intensity is hot pink (#ff5fa2), used the way the image
+ * uses its sun: one small ember, nowhere else. Display type is a serif
+ * (Hedvig Letters Serif); everything operational stays Inter/mono.
  */
 @theme {
-  --color-bg: #f5f5f7; /* Apple's page grey */
-  --color-panel: #ffffff; /* cards sit above it in pure white */
-  --color-panel2: #fafafa;
-  --color-line: #d2d2d7; /* hairline separator */
-  --color-fg: #1d1d1f; /* near-black, never pure #000 for text */
-  --color-muted: #6e6e73;
-  --color-dim: #86868b;
-  --color-acc: #1d1d1f; /* "accent" is ink */
-  --color-accdim: #e8e8ed;
-  --color-red: #6e6e73; /* negatives recede rather than shout */
-  --color-amber: #86868b;
+  --color-bg: #241540; /* plum ground */
+  --color-panel: #2e1d4f; /* cards lift one step toward violet */
+  --color-panel2: #291947;
+  --color-line: rgba(247, 227, 211, 0.14); /* peach hairline */
+  --color-fg: #f7e3d3; /* pale peach, never pure white */
+  --color-muted: #c3b0dd; /* mauve */
+  --color-dim: #9680bb; /* dusky violet */
+  --color-acc: #ff5fa2; /* the sun's last ember */
+  --color-accdim: #3d2a5c; /* violet midtone, for fills */
+  --color-red: #c3b0dd; /* negatives recede rather than shout */
+  --color-amber: #9680bb;
 
+  --font-sans: var(--font-inter), 'Inter', system-ui, 'Helvetica Neue', Arial, sans-serif;
+  --font-serif:
+    var(--font-hedvig), 'Hedvig Letters Serif', Georgia, Cambria, 'Times New Roman', serif;
   --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
 }
 
@@ -34,22 +36,33 @@ body {
 }
 
 body {
-  font-family:
-    -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue',
-    Helvetica, Arial, sans-serif;
+  font-family: var(--font-sans);
   letter-spacing: -0.01em;
 }
 
-/* Apple sets display type tight and heavy; small text stays roomy. */
+/* Display type is serif, set tight; small text stays roomy. */
 h1,
 h2,
 h3 {
-  letter-spacing: -0.022em;
+  font-family: var(--font-serif);
+  font-weight: 400;
+  letter-spacing: -0.02em;
 }
 
 ::selection {
-  background: var(--color-accdim);
-  color: var(--color-fg);
+  background: var(--color-acc);
+  color: #241540;
+}
+
+/* Film grain over everything, like the painting photographed on grainy film. */
+.grain::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  pointer-events: none;
+  opacity: 0.28;
+  background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScyMDAnIGhlaWdodD0nMjAwJz48ZmlsdGVyIGlkPSduJz48ZmVUdXJidWxlbmNlIHR5cGU9J2ZyYWN0YWxOb2lzZScgYmFzZUZyZXF1ZW5jeT0nMC44JyBudW1PY3RhdmVzPSczJy8+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9JzIwMCcgaGVpZ2h0PScyMDAnIGZpbHRlcj0ndXJsKCNuKScgb3BhY2l0eT0nMC4zNScvPjwvc3ZnPg==");
 }
 
 .thin-scroll::-webkit-scrollbar {
@@ -60,11 +73,11 @@ h3 {
   background: transparent;
 }
 .thin-scroll::-webkit-scrollbar-thumb {
-  background: #c7c7cc;
+  background: #5a4178;
   border-radius: 4px;
 }
 .thin-scroll::-webkit-scrollbar-thumb:hover {
-  background: #aeaeb2;
+  background: #6d528f;
 }
 
 @keyframes foundry-pulse {
@@ -114,28 +127,93 @@ h3 {
   animation: foundry-in 0.35s ease-out;
 }
 
-/* One soft elevation, used sparingly — Apple leans on shadow, not borders. */
+/* Shadows sink into the plum ground; violet-black, never grey. */
 .card-shadow {
   box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.04),
-    0 4px 16px rgba(0, 0, 0, 0.06);
+    0 1px 2px rgba(13, 6, 28, 0.35),
+    0 4px 16px rgba(13, 6, 28, 0.35);
 }
 .card-shadow-lg {
   box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.06),
-    0 24px 64px rgba(0, 0, 0, 0.14);
+    0 2px 8px rgba(13, 6, 28, 0.4),
+    0 24px 64px rgba(13, 6, 28, 0.6);
 }
 
-/* Hover lift for the tiles. A plain class, because Tailwind variants cannot
-   apply a non-utility class. */
 .card-hover {
   transition:
     box-shadow 0.22s ease,
-    transform 0.22s ease;
+    transform 0.22s ease,
+    border-color 0.22s ease;
 }
 .card-hover:hover {
   transform: translateY(-2px);
+  border-color: rgba(247, 227, 211, 0.28);
   box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.06),
-    0 16px 40px rgba(0, 0, 0, 0.12);
+    0 2px 8px rgba(13, 6, 28, 0.4),
+    0 16px 40px rgba(13, 6, 28, 0.55);
+}
+
+/* ---------- the ember pill ----------
+   Priceflag's glass button, recast: pink ember on plum. Use once per view. */
+.btn-ember {
+  --ember: 255, 95, 162;
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 22px;
+  border: 0;
+  border-radius: 999px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  color: #2b0a1c;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.06) 55%, rgba(255, 255, 255, 0)),
+    #ff5fa2;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.1),
+    0 1px 2px rgba(13, 6, 28, 0.45),
+    0 10px 30px -8px rgba(var(--ember), 0.6),
+    0 0 0 6px rgba(var(--ember), 0.1);
+  transition:
+    transform 0.34s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.34s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.34s ease;
+}
+.btn-ember:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.05);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.1),
+    0 2px 4px rgba(13, 6, 28, 0.42),
+    0 18px 44px -10px rgba(var(--ember), 0.78),
+    0 0 0 9px rgba(var(--ember), 0.13);
+}
+.btn-ember:active {
+  transform: translateY(0) scale(0.985);
+  transition-duration: 0.09s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-ember {
+    transition: none;
+  }
+  .btn-ember:hover {
+    transform: none;
+  }
+  .shimmer,
+  .pulse,
+  .row-in {
+    animation: none;
+  }
 }
