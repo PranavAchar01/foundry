@@ -1,0 +1,74 @@
+name: CEO loop
+
+# The CEO cycle runs on two independent schedulers:
+#
+#  1. Vercel Cron (vercel.json) — the platform-native path. This account is on
+#     Hobby, which permits only daily cron expressions, so it is pinned to
+#     `0 15 * * *`. On Pro, change that one line to `*/5 * * * *` and delete
+#     nothing else.
+#  2. This workflow — fires every 5 minutes today, on any plan, by calling the
+#     same endpoint with the shared secret.
+#
+# Both hit `GET /api/cron/ceo`, which is the only entry point to `runCycle()`.
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+    inputs:
+      niche:
+        description: 'Force a specific niche for this cycle'
+        required: false
+        type: string
+
+concurrency:
+  group: ceo-loop
+  cancel-in-progress: false
+
+jobs:
+  cycle:
+    name: run one CEO cycle
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Invoke the CEO loop
+        env:
+          BASE: ${{ vars.FOUNDRY_PUBLIC_URL || 'https://foundry-biz.vercel.app' }}
+          SECRET: ${{ secrets.CRON_SECRET }}
+          NICHE: ${{ inputs.niche }}
+        run: |
+          if [ -z "$SECRET" ]; then
+            echo "::error::CRON_SECRET is not set on this repository."
+            exit 1
+          fi
+
+          URL="$BASE/api/cron/ceo"
+          if [ -n "$NICHE" ]; then
+            URL="$URL?niche=$(printf '%s' "$NICHE" | jq -sRr @uri)"
+          fi
+
+          echo "POST $URL"
+          code=$(curl -sS -o cycle.json -w '%{http_code}' -m 540 \
+            -X POST "$URL" -H "authorization: Bearer $SECRET")
+
+          echo "HTTP $code"
+          jq -r '
+            if .halted then
+              "HALTED: \(.haltReason)"
+            else
+              "cycle \(.cycleId) · \(.steps | length) step(s) · $\(.budget.spentUsd) spent of $\(.budget.totalBudgetUsd)"
+            end,
+            (.steps[]? | "  \(.action)\t\(.businessId // "-")\t\(.reasoning[0:160])")
+          ' cycle.json || cat cycle.json
+
+          [ "$code" = "200" ]
+
+      - name: Summarise the cycle
+        if: always()
+        run: |
+          {
+            echo '### CEO cycle'
+            echo '```json'
+            head -c 4000 cycle.json 2>/dev/null || echo 'no response captured'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
