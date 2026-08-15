@@ -21,10 +21,13 @@
   --color-red: #c3b0dd; /* negatives recede rather than shout */
   --color-amber: #9680bb;
 
+  /* Two typefaces only: Hedvig for display, Inter for everything else.
+     The mono token stays defined so existing font-mono classes keep working,
+     but it now resolves to Inter — no third face anywhere. */
   --font-sans: var(--font-inter), 'Inter', system-ui, 'Helvetica Neue', Arial, sans-serif;
   --font-serif:
     var(--font-hedvig), 'Hedvig Letters Serif', Georgia, Cambria, 'Times New Roman', serif;
-  --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+  --font-mono: var(--font-inter), 'Inter', system-ui, 'Helvetica Neue', Arial, sans-serif;
 }
 
 html,
@@ -204,16 +207,175 @@ h3 {
   transition-duration: 0.09s;
 }
 
+/* ---------- page-load intro (Priceflag's choreography) ----------
+   The hero image fades in from blur while zooming out; eyebrow, title and
+   CTA rise in staggered. Add .intro-go on mount to play. */
+@keyframes heroMediaFade {
+  from {
+    opacity: 0;
+    filter: blur(18px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0px);
+  }
+}
+@keyframes heroMediaZoom {
+  from {
+    transform: scale3d(1.11, 1.11, 1);
+  }
+  to {
+    transform: scale3d(1, 1, 1);
+  }
+}
+@keyframes heroRiseLg {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 30px, 0) scale3d(0.985, 0.985, 1);
+    filter: blur(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0px);
+  }
+}
+@keyframes heroRise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 12px, 0);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0px);
+  }
+}
+.intro .hero-media,
+.intro .hero-title,
+.intro .hero-eyebrow,
+.intro .hero-cta {
+  opacity: 0;
+}
+.intro-go .hero-media {
+  animation:
+    heroMediaFade 1000ms cubic-bezier(0.22, 1, 0.36, 1) both,
+    heroMediaZoom 2200ms cubic-bezier(0.58, 0.04, 0.16, 1) both;
+}
+.intro-go .hero-title {
+  animation: heroRiseLg 1050ms cubic-bezier(0.22, 1, 0.36, 1) 420ms both;
+}
+.intro-go .hero-eyebrow {
+  animation: heroRise 800ms cubic-bezier(0.22, 1, 0.36, 1) 1080ms both;
+}
+.intro-go .hero-cta {
+  animation: heroRise 800ms cubic-bezier(0.22, 1, 0.36, 1) 1360ms both;
+}
+
+/* ---------- footer: the ember slab (Priceflag's neon slab, recast pink) ---------- */
+.foot-slab {
+  /* Fills any elastic-scroll gap below the footer with the same pink. */
+  box-shadow: 0 50vh 0 0 #ff5fa2;
+  --foot-ink: #2b0a1c;
+  --foot-ink-soft: rgba(43, 10, 28, 0.68);
+  --foot-rule: rgba(43, 10, 28, 0.2);
+  position: relative;
+  z-index: 2;
+  background: #ff5fa2;
+  color: var(--foot-ink);
+  border-radius: 26px 26px 0 0;
+  overflow: hidden;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+.foot-slab a {
+  color: var(--foot-ink);
+  text-decoration: none;
+}
+.foot-slab a:hover,
+.foot-slab a:focus {
+  color: #241540;
+}
+.foot-slab a:focus-visible {
+  outline: 2px solid #2b0a1c;
+  outline-offset: 4px;
+  border-radius: 3px;
+}
+/* The giant wordmark: width 100% of the content box, drawn as svg text. */
+.foot-word {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: clamp(34px, 5vw, 60px);
+  fill: var(--foot-ink);
+  font-family: var(--font-serif);
+  font-weight: 400;
+}
+/* The dark pill on the slab (Priceflag's pf-btn--dark equivalent). */
+.btn-plum {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border: 0;
+  border-radius: 999px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  color: #f7e3d3;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  background: #241540;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 1px 2px rgba(43, 10, 28, 0.35),
+    0 10px 30px -8px rgba(36, 21, 64, 0.5);
+  transition:
+    transform 0.34s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.foot-slab .btn-plum,
+.foot-slab .btn-plum:hover {
+  color: #f7e3d3;
+}
+.btn-plum:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 2px 4px rgba(43, 10, 28, 0.35),
+    0 16px 40px -10px rgba(36, 21, 64, 0.65);
+}
+.btn-plum:active {
+  transform: translateY(0) scale(0.985);
+  transition-duration: 0.09s;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .btn-ember {
+  .btn-ember,
+  .btn-plum {
     transition: none;
   }
-  .btn-ember:hover {
+  .btn-ember:hover,
+  .btn-plum:hover {
     transform: none;
   }
   .shimmer,
   .pulse,
   .row-in {
     animation: none;
+  }
+  .intro .hero-media,
+  .intro .hero-title,
+  .intro .hero-eyebrow,
+  .intro .hero-cta {
+    opacity: 1;
+    animation: none !important;
+    transform: none !important;
+    filter: none !important;
   }
 }
