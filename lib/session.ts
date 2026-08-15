@@ -168,6 +168,12 @@ export async function requireConnected(): Promise<
   if (!sessionId) return { ok: false, error: 'connect your own X account first' };
 
   const state = await describe(sessionId);
+
+  // The owner authorized against the deployment's own X app, before sessions
+  // existed, so they have an account and no per-session credentials. Requiring
+  // credentials of them would lock out the one account this preserves.
+  if (state.isOwner) return { ok: true, sessionId };
+
   if (!state.hasCredentials) {
     return { ok: false, error: 'add your own X app credentials first' };
   }
