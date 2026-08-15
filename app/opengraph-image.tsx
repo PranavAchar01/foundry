@@ -22,7 +22,7 @@ export default function OgImage() {
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
-          background: '#241540',
+          background: '#0b0614',
           color: '#f7e3d3',
           padding: 72,
           fontFamily: 'Helvetica, Arial, sans-serif',
