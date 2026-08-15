@@ -187,16 +187,7 @@ export default function Dashboard() {
                 {/* the company's actual hero page */}
                 <div className="relative h-44 overflow-hidden border-b border-[var(--color-line)] bg-[var(--color-panel2)]">
                   {b.url ? (
-                    <iframe
-                      src={b.url}
-                      title={b.name}
-                      aria-hidden
-                      tabIndex={-1}
-                      scrolling="no"
-                      sandbox="allow-scripts allow-same-origin"
-                      className="pointer-events-none absolute top-0 left-0 origin-top-left border-0"
-                      style={{ width: '1280px', height: '880px', transform: 'scale(0.29)' }}
-                    />
+                    <TilePreview url={b.url} name={b.name} />
                   ) : (
                     <div className="flex h-full items-center justify-center font-mono text-[11px] text-[var(--color-dim)]">
                       no storefront
@@ -257,10 +248,36 @@ export default function Dashboard() {
         <p className="mt-3 font-mono text-[10px] text-[var(--color-dim)]">
           {data.providers.map((p) => `${p.capability}=${p.active}`).join(' · ')}
         </p>
+        <p className="mt-2 text-[11px] text-[var(--color-muted)]">
+          Every company on this page — and this page itself — is operated end-to-end by an AI
+          agent. No human runs these businesses.
+        </p>
       </footer>
 
       {open && <CompanyDetail id={open} onClose={() => setOpen(null)} />}
     </main>
+  );
+}
+
+function TilePreview({ url, name }: { url: string; name: string }) {
+  const [loaded, setLoaded] = useState(false);
+  return (
+    <>
+      {!loaded && <div className="shimmer absolute inset-0" />}
+      <iframe
+        src={url}
+        title={name}
+        aria-hidden
+        tabIndex={-1}
+        scrolling="no"
+        sandbox="allow-scripts allow-same-origin"
+        onLoad={() => setLoaded(true)}
+        className={`pointer-events-none absolute top-0 left-0 origin-top-left border-0 transition-opacity duration-500 ${
+          loaded ? 'opacity-100' : 'opacity-0'
+        }`}
+        style={{ width: '1280px', height: '880px', transform: 'scale(0.29)' }}
+      />
+    </>
   );
 }
 
