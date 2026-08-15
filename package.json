@@ -16,6 +16,7 @@
     "env:push": "node scripts/push-env-vercel.mjs",
     "deploy": "node scripts/deploy-vercel.mjs",
     "smoke": "node scripts/smoke.mjs",
+    "go-live": "node scripts/go-live.mjs",
     "verify:terac": "node scripts/verify-terac.mjs",
     "verify:all": "node scripts/verify-all.mjs"
   },

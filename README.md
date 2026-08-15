@@ -108,3 +108,13 @@ The account behind this has `card_payments` **inactive** and
 
 Everything up to that line is built and tested, including a full webhook replay
 against the real signing secret (`tests/stripe-webhook.test.ts`).
+
+## Go live in one command
+
+```bash
+pnpm go-live
+```
+
+Runs preflight → migrate → env push → deploy → smoke, stopping at the first
+failure. Every step is independently runnable (`pnpm verify:all`, `pnpm
+migrate`, `pnpm env:push`, `pnpm deploy`, `pnpm smoke`).
