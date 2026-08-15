@@ -1,5 +1,13 @@
 import type { Metadata } from 'next';
+import { Hedvig_Letters_Serif, Inter } from 'next/font/google';
 import './globals.css';
+
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
+const hedvig = Hedvig_Letters_Serif({
+  subsets: ['latin'],
+  weight: '400',
+  variable: '--font-hedvig',
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.FOUNDRY_PUBLIC_URL || 'https://foundry-biz-eight.vercel.app'),
@@ -26,8 +34,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className="min-h-screen">{children}</body>
+    <html lang="en" className={`${inter.variable} ${hedvig.variable}`}>
+      <body className="grain min-h-screen">{children}</body>
     </html>
   );
 }
