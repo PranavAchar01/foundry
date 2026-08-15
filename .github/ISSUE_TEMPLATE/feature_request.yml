@@ -1,0 +1,38 @@
+name: Feature request
+description: Propose something the system should be able to do.
+labels: ['enhancement']
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What is hard or impossible today? Describe the situation, not the solution.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would build
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What else you considered
+      description: Including doing nothing, and why that is not enough.
+
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety properties
+      description: >
+        These are non-negotiable. See CONTRIBUTING.md.
+      options:
+        - label: This does not weaken the append-only tables.
+          required: true
+        - label: This does not bypass the outreach allowlist or make sending automatic.
+          required: true
+        - label: This does not remove the AI-operated disclosure from storefronts.
+          required: true

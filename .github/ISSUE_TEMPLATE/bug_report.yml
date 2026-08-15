@@ -1,0 +1,69 @@
+name: Bug report
+description: Something behaves differently from what it says it does.
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. The most useful bug report names the gap between
+        what the code claims and what it did.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you observe, and what did you expect instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce
+      description: The inputs, sequence, or state that produce it.
+      placeholder: |
+        1. Run `pnpm migrate`
+        2. POST /api/demo/plan with ...
+        3. The response contains ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - spawn / storefront generation
+        - guardrails, budget, or circuit breaker
+        - outreach, allowlist, or conversations
+        - labor marketplace listing
+        - checkout, webhook, or ledger
+        - machines
+        - dashboard or run UI
+        - scripts, migration, or deploy
+        - other
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant output
+      description: Error text or logs. Redact anything sensitive before pasting.
+      render: shell
+
+  - type: input
+    id: version
+    attributes:
+      label: Commit
+      description: Output of `git rev-parse --short HEAD`.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I have removed every credential and secret from what I pasted.
+          required: true
+        - label: This is not a security vulnerability (those go to the advisory link).
+          required: true
