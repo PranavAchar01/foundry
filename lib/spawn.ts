@@ -310,3 +310,61 @@ async function uniqueSlug(base: string): Promise<string> {
   }
   return `${base}-${Date.now().toString(36).slice(-4)}`;
 }
+
+/**
+ * Re-render and redeploy every live business's storefront with the current
+ * template.
+ *
+ * A spawned site is a static deployment frozen at spawn time, so changing the
+ * template only affects businesses spawned afterwards. This brings the existing
+ * ones forward. It redeploys to the same project, so each business keeps its
+ * URL and nothing in the database changes.
+ */
+export async function restyleAll(): Promise<
+  { businessId: string; name: string; ok: boolean; detail: string }[]
+> {
+  const live = await businesses.live();
+  const pagegen = pagegenProvider();
+  const host = hostProvider();
+  const out: { businessId: string; name: string; ok: boolean; detail: string }[] = [];
+
+  for (const b of live) {
+    try {
+      const meta = b.meta as { bullets?: string[] };
+      const page = await pagegen.generate({
+        businessId: b.id,
+        slug: b.slug,
+        name: b.name,
+        tagline: b.tagline,
+        niche: b.niche,
+        offer: b.tagline,
+        targetCustomer: b.niche,
+        priceCents: b.price_cents,
+        bullets: meta.bullets ?? [],
+        checkoutEndpoint: `${env.publicUrl}/api/checkout`,
+        beaconEndpoint: `${env.publicUrl}/api/track`,
+        disclosure: env.disclosureLine,
+      });
+
+      // A provider that hosts its own site has nothing to redeploy here.
+      if (page.hostedUrl) {
+        out.push({ businessId: b.id, name: b.name, ok: true, detail: `hosted by ${page.provider}, left alone` });
+        continue;
+      }
+
+      const deployed = await host.deploy({
+        slug: b.slug,
+        files: [{ path: 'index.html', content: page.html }],
+      });
+      out.push({
+        businessId: b.id,
+        name: b.name,
+        ok: true,
+        detail: `redeployed to ${deployed.url}`,
+      });
+    } catch (err) {
+      out.push({ businessId: b.id, name: b.name, ok: false, detail: String(err).slice(0, 200) });
+    }
+  }
+  return out;
+}
