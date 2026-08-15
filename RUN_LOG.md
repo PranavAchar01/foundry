@@ -1116,3 +1116,45 @@ per username as well. Preflight reports any allowlist member already carrying a
 DM, a draft or a conversation instead of letting the difference show up on
 camera.
 
+
+## The generator was never called, and Terac was never asked correctly
+
+Two things were built and then not connected.
+
+`lib/providers/poster.ts` — the deck that deals a page's archetype, palette,
+type pairing, motif, ratio and angle before the model is called — existed in
+full and was imported by nothing. `pagegen` still shipped the deterministic
+template, so every storefront was the same page with different words. It was
+also untracked, which is the second half of the same story: `.gitignore`
+carried an unanchored `build/`, which matches a directory of that name at any
+depth, and had been silently keeping `app/api/demo/build` out of git and
+therefore out of every deploy.
+
+The deck was missing a motion axis. Its brief constrained animation — no
+scroll-driven reveals, no long delays — but never asked for one, so pages
+arrived static. Each page is now dealt one load-time move chosen to suit the
+archetype it already has, and the gate rejects a document with no `@keyframes`
+or no `prefers-reduced-motion` guard.
+
+The brief also promised something nobody kept. It told the model at length that
+a checkout and beacon script would be appended for it, and rejected the page if
+it wrote one itself — and nothing appended anything. Every authored page would
+have shipped a dead button and no pageview: a storefront that looks perfect and
+cannot take money.
+
+Terac was failing on every build with "could not price the listing", which read
+like a judgement about margin and was a malformed request. Terac rejects
+`timelineHours` below 72; the provider defaulted to 2. Its own validation errors
+turned out to be the best documentation available, and were also how the draft
+opportunity shape was found: an `activity` task must carry `duration_minutes`
+because that is what drives pricing, and an opportunity with no filters is
+refused unless it explicitly records that recruiting anyone was deliberate.
+
+The listing is now a draft rather than a quote-and-launch. Terac creates it,
+prices it and shows it on the dashboard, but recruits nobody and charges nothing
+until it is launched. This is not a shortcut — it is the only honest option at
+eight per run. Launching eight would commit several hundred dollars against a
+$125 balance, and a dashboard reporting eight hires it had not paid for would
+be a lie. What it reports now is exactly true: the work behind each subscription
+is really posted, and nobody has been paid.
+
