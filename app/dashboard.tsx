@@ -66,8 +66,8 @@ const usd = (cents: number | string) => `$${(Math.abs(Number(cents)) / 100).toFi
 
 const STATUS: Record<Card['status'], string> = {
   // Solid peach = earning, outline peach = still being tested, flat violet = dead.
-  SCALING: 'border-transparent bg-[var(--color-fg)] text-[#241540]',
-  TESTING: 'border-[var(--color-fg)] bg-[color:rgba(36,21,64,0.55)] text-[var(--color-fg)]',
+  SCALING: 'border-transparent bg-[var(--color-fg)] text-[#0b0614]',
+  TESTING: 'border-[var(--color-fg)] bg-[color:rgba(11,6,20,0.55)] text-[var(--color-fg)]',
   KILLED: 'border-transparent bg-[var(--color-accdim)] text-[var(--color-muted)]',
 };
 
@@ -154,19 +154,19 @@ export default function Dashboard() {
             className="absolute inset-0"
             style={{
               background:
-                'linear-gradient(180deg, rgba(36,21,64,0.45) 0%, rgba(36,21,64,0) 18%, rgba(36,21,64,0) 60%, rgba(36,21,64,0.5) 85%, rgba(36,21,64,0.95) 100%)',
+                'linear-gradient(180deg, rgba(11,6,20,0.45) 0%, rgba(11,6,20,0) 18%, rgba(11,6,20,0) 60%, rgba(11,6,20,0.5) 85%, rgba(11,6,20,0.95) 100%)',
             }}
           />
           <div className="relative flex h-full flex-col items-center justify-center px-6 text-center">
             <p
               className="hero-eyebrow text-[13px] tracking-[0.12em] text-[var(--color-fg)] uppercase"
-              style={{ textShadow: '0 1px 12px rgba(36,21,64,0.8)' }}
+              style={{ textShadow: '0 1px 12px rgba(11,6,20,0.8)' }}
             >
               An autonomous holding company · {live.length} companies live
             </p>
             <h1
               className="hero-title text-[clamp(48px,7.2vw,88px)] leading-[1.05] font-normal tracking-[-0.015em] text-white"
-              style={{ textShadow: '0 4px 50px rgba(36,21,64,0.7)' }}
+              style={{ textShadow: '0 4px 50px rgba(11,6,20,0.7)' }}
             >
               The holding company
               <br />
@@ -208,10 +208,10 @@ export default function Dashboard() {
       <div id="portfolio" className="mx-auto max-w-[1500px] px-6 py-8">
       {budget.breaker.tripped && (
         <div className="mb-6 rounded-2xl border border-[var(--color-line)] bg-[var(--color-fg)] px-5 py-3">
-          <span className="font-mono text-[11px] tracking-wider text-[#241540] uppercase">
+          <span className="font-mono text-[11px] tracking-wider text-[#0b0614] uppercase">
             circuit breaker tripped
           </span>
-          <span className="ml-3 text-sm text-[#241540]/80">{budget.breaker.reason}</span>
+          <span className="ml-3 text-sm text-[#0b0614]/80">{budget.breaker.reason}</span>
         </div>
       )}
 
@@ -240,7 +240,7 @@ export default function Dashboard() {
                     </div>
                   )}
                   {b.status === 'KILLED' && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-[#241540]/70 text-[11px] font-medium tracking-[0.18em] text-[var(--color-fg)] backdrop-blur-[2px]">
+                    <div className="absolute inset-0 flex items-center justify-center bg-[#0b0614]/70 text-[11px] font-medium tracking-[0.18em] text-[var(--color-fg)] backdrop-blur-[2px]">
                       KILLED
                     </div>
                   )}
@@ -250,7 +250,7 @@ export default function Dashboard() {
                     {b.status}
                   </span>
                   {m && (
-                    <span className="absolute bottom-2 left-2 rounded-full border border-[var(--color-line)] bg-[#241540]/80 px-2 py-0.5 font-mono text-[9px] text-[var(--color-muted)] backdrop-blur-sm">
+                    <span className="absolute bottom-2 left-2 rounded-full border border-[var(--color-line)] bg-[#0b0614]/80 px-2 py-0.5 font-mono text-[9px] text-[var(--color-muted)] backdrop-blur-sm">
                       {m.status === 'active' ? <span className="pulse text-[var(--color-fg)]">● </span> : '○ '}
                       VM {m.status}
                     </span>

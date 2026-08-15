@@ -175,7 +175,7 @@ export default function CompanyDetail({ id, onClose }: { id: string; onClose: ()
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#170c2b]/60 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#050209]/60 p-4 backdrop-blur-sm"
       onClick={onClose}
     >
       <div

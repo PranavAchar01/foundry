@@ -1,23 +1,23 @@
 @import 'tailwindcss';
 
 /*
- * Dusk. The palette of the hero painting: a vast violet slope at last light.
- *
- * Ground is plum, never black — the scene stays luminous. Type is pale peach.
+ * Dusk, after the light has gone. Near-black ground with a violet whisper;
+ * the color lives in the hero painting and the foreground, not the page.
+ * Type is pale peach.
  * The single point of intensity is hot pink (#ff5fa2), used the way the image
  * uses its sun: one small ember, nowhere else. Display type is a serif
  * (Hedvig Letters Serif); everything operational stays Inter/mono.
  */
 @theme {
-  --color-bg: #241540; /* plum ground */
-  --color-panel: #2e1d4f; /* cards lift one step toward violet */
-  --color-panel2: #291947;
+  --color-bg: #0b0614; /* plum ground */
+  --color-panel: #140c22; /* cards lift one step toward violet */
+  --color-panel2: #100a1c;
   --color-line: rgba(247, 227, 211, 0.14); /* peach hairline */
   --color-fg: #f7e3d3; /* pale peach, never pure white */
   --color-muted: #c3b0dd; /* mauve */
   --color-dim: #9680bb; /* dusky violet */
   --color-acc: #ff5fa2; /* the sun's last ember */
-  --color-accdim: #3d2a5c; /* violet midtone, for fills */
+  --color-accdim: #1f1433; /* violet midtone, for fills */
   --color-red: #c3b0dd; /* negatives recede rather than shout */
   --color-amber: #9680bb;
 
@@ -54,7 +54,7 @@ h3 {
 
 ::selection {
   background: var(--color-acc);
-  color: #241540;
+  color: #0b0614;
 }
 
 /* Film grain over everything, like the painting photographed on grainy film. */
@@ -295,7 +295,7 @@ h3 {
 }
 .foot-slab a:hover,
 .foot-slab a:focus {
-  color: #241540;
+  color: #0b0614;
 }
 .foot-slab a:focus-visible {
   outline: 2px solid #2b0a1c;
@@ -330,11 +330,11 @@ h3 {
   cursor: pointer;
   text-decoration: none;
   white-space: nowrap;
-  background: #241540;
+  background: #0b0614;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.12),
     0 1px 2px rgba(43, 10, 28, 0.35),
-    0 10px 30px -8px rgba(36, 21, 64, 0.5);
+    0 10px 30px -8px rgba(11, 6, 20, 0.5);
   transition:
     transform 0.34s cubic-bezier(0.22, 1, 0.36, 1),
     box-shadow 0.34s cubic-bezier(0.22, 1, 0.36, 1);
@@ -348,7 +348,7 @@ h3 {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.18),
     0 2px 4px rgba(43, 10, 28, 0.35),
-    0 16px 40px -10px rgba(36, 21, 64, 0.65);
+    0 16px 40px -10px rgba(11, 6, 20, 0.65);
 }
 .btn-plum:active {
   transform: translateY(0) scale(0.985);
