@@ -143,13 +143,13 @@ export async function POST(req: Request) {
 
         let followed = member.followed;
         if (!followed) {
-          const f = await x.follow(gate.x_user_id);
+          const f = await x.follow('server', gate.x_user_id);
           followed = f.ok;
           if (f.ok) await cohort.markFollowed(member.username);
         }
 
         const message = personalise(draft.message);
-        const sent = await x.sendDm(gate.x_user_id, message);
+        const sent = await x.sendDm('server', gate.x_user_id, message);
         if (sent.ok) {
           await cohort.markDmSent(member.username);
           await prospects.markSent(draft.id);

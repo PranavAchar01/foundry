@@ -306,6 +306,18 @@ export const env = {
   },
 
   /** Shared secret for manually poking the CEO cron outside Vercel's scheduler. */
+  /**
+   * Unlocks the deployment's own X account for one browser session.
+   *
+   * Sessions arrived after the owner had already authorized, so without this
+   * the owner would be signed out by their own multi-tenancy change. Holding
+   * the key binds the existing account to a session; it never mints tokens and
+   * never touches an account a visitor authorized.
+   */
+  get ownerKey() {
+    return str('FOUNDRY_OWNER_KEY');
+  },
+
   get cronSecret() {
     return str('CRON_SECRET');
   },

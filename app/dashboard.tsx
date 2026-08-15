@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import CompanyDetail, { type Prospect } from './detail';
 import ClientRun, { type RunPerson } from './client-run';
+import Connect, { type SessionState } from './connect';
 
 /**
  * One page. Every company is a tile showing its actual hero page, live.
@@ -71,6 +72,12 @@ interface Opened {
 export default function Dashboard() {
   const [data, setData] = useState<Payload | null>(null);
   const [machines, setMachines] = useState<MachineLite[]>([]);
+  /*
+   * Read once on mount, which is also what creates the session cookie. Until it
+   * resolves the run controls are not rendered at all, so a visitor never sees
+   * a button that would act as somebody else.
+   */
+  const [xSession, setXSession] = useState<SessionState | null>(null);
   const [people, setPeople] = useState<RunPerson[]>([]);
   const [open, setOpen] = useState<Opened | null>(null);
   const [connected, setConnected] = useState(false);
@@ -81,6 +88,17 @@ export default function Dashboard() {
   useEffect(() => {
     // Kick the hero choreography after hydration; 'both' fill keeps the end state.
     setIntroGo(true);
+  }, []);
+
+  // Reading the session is also what issues the cookie, so this is the first
+  // thing a new browser does.
+  useEffect(() => {
+    fetch('/api/x/session', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((j: SessionState & { error?: string }) => {
+        if (!j.error) setXSession(j);
+      })
+      .catch(() => {});
   }, []);
 
   const refresh = useCallback(async () => {
@@ -215,6 +233,8 @@ export default function Dashboard() {
         </div>
       </section>
 
+      {xSession?.account ? null : <Connect state={xSession} onChange={setXSession} />}
+
       {/* A slim status line under the painting. The company's own P&L is kept
           off the dashboard; what belongs here is whether it is running. */}
       <div className="border-b border-[var(--color-line)]">
@@ -245,7 +265,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      <ClientRun onPeople={setPeople} onSettled={refresh} />
+      {xSession?.account && <ClientRun onPeople={setPeople} onSettled={refresh} />}
 
       {/* ---- the wall of companies ---- */}
       {tiles.length === 0 ? (

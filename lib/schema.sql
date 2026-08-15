@@ -447,3 +447,33 @@ DROP TRIGGER IF EXISTS machine_runs_append_only ON machine_runs;
 CREATE TRIGGER machine_runs_append_only
   BEFORE UPDATE OR DELETE ON machine_runs
   FOR EACH ROW EXECUTE FUNCTION foundry_append_only();
+
+
+-- ---------------------------------------------------------------------------
+-- Multi-tenancy for X.
+--
+-- The site is public, and the run it offers follows and messages real people.
+-- Without a per-visitor identity every visitor would act as whoever happened to
+-- authorize the server, which means a stranger spending the owner's rate limit
+-- and messaging from the owner's handle. Each browser therefore gets a session,
+-- brings its own X app credentials, and authorizes its own account.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS x_sessions (
+  id            TEXT PRIMARY KEY,
+  -- The visitor's own X app. Supplied by them; never returned by any endpoint.
+  client_id     TEXT        NOT NULL DEFAULT '',
+  client_secret TEXT        NOT NULL DEFAULT '',
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_seen_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Which session an authorization belongs to. NULL is the server's own account,
+-- the one the cron loops run as, which has no browser behind it.
+ALTER TABLE x_accounts     ADD COLUMN IF NOT EXISTS session_id TEXT REFERENCES x_sessions (id) ON DELETE CASCADE;
+ALTER TABLE x_oauth_states ADD COLUMN IF NOT EXISTS session_id TEXT REFERENCES x_sessions (id) ON DELETE CASCADE;
+
+-- One connected account per session, but the server account (NULL) is exempt
+-- because it predates sessions and must keep working untouched.
+CREATE UNIQUE INDEX IF NOT EXISTS x_accounts_session_idx
+  ON x_accounts (session_id) WHERE session_id IS NOT NULL;

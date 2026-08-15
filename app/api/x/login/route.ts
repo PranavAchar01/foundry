@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { beginAuthorization } from '@/lib/x';
+import * as session from '@/lib/session';
 import { errorMessage, json } from '@/lib/http';
 
 export const runtime = 'nodejs';
@@ -15,7 +16,10 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(req: Request) {
   try {
-    const { url } = await beginAuthorization();
+    // Authorizes into this browser's session, using the app credentials that
+    // session supplied, so the tokens minted belong to the visitor.
+    const row = await session.ensure();
+    const { url } = await beginAuthorization({ sessionId: row.id });
     // ?json=1 returns the URL instead of redirecting, for scripted setup.
     if (new URL(req.url).searchParams.get('json') === '1') return json({ authorizeUrl: url });
     return NextResponse.redirect(url);
