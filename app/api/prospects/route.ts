@@ -10,7 +10,9 @@ export const maxDuration = 300;
 export async function GET() {
   try {
     return json({
-      note: 'Foundry drafts these. It does not send them — X prohibits unsolicited automated DMs.',
+      note:
+        'Drafts. Sending happens only through /api/demo/run and only to accounts on the ' +
+        'contact allowlist (/api/cohort) — anyone else cannot be messaged.',
       drafts: await prospects.drafts(),
     });
   } catch (err) {

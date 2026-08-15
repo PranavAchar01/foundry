@@ -170,9 +170,9 @@ export async function draftForSegment(
     businessId: opts.businessId ?? segment.business_id,
     action: 'OUTREACH_DRAFTED',
     reasoning:
-      `Wrote ${saved.length} outreach draft(s) for "${segment.label}". Nothing was sent — X's ` +
-      'automation rules prohibit unsolicited automated DMs, so these are held for a human to ' +
-      'review and send.',
+      `Wrote ${saved.length} outreach draft(s) for "${segment.label}". Sending is gated on the ` +
+      'contact allowlist: an account that did not agree to be contacted cannot be messaged, ' +
+      'which is what keeps these solicited rather than cold.',
     confidence: 0.7,
     model,
     inputs: { segmentId: segment.id, candidates: candidates.length, limit },

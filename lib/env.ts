@@ -59,6 +59,17 @@ export const env = {
   get xClientSecret() {
     return str('X_CLIENT_SECRET');
   },
+  /**
+   * Consumer API Key / Secret from "Keys and tokens". Distinct from the
+   * OAuth 2.0 client id/secret: the Account Activity API signs its CRC and its
+   * webhook deliveries with the consumer secret.
+   */
+  get xApiKey() {
+    return str('X_API_KEY');
+  },
+  get xApiKeySecret() {
+    return str('X_API_KEY_SECRET');
+  },
   get xCallbackUrl() {
     return str('X_CALLBACK_URL') || `${this.publicUrl}/api/x/callback`;
   },

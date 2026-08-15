@@ -83,6 +83,8 @@ const KEYS = [
   // Audience intelligence + the hiring economics.
   'X_CLIENT_ID',
   'X_CLIENT_SECRET',
+  'X_API_KEY',
+  'X_API_KEY_SECRET',
   'X_CALLBACK_URL',
   'FOUNDRY_LABOR_PAYOUT_SHARE',
 ];
