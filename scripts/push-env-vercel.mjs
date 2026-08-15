@@ -80,6 +80,11 @@ const KEYS = [
   // Per-business machines.
   'FOUNDRY_MACHINE_USD_PER_HOUR',
   'FOUNDRY_MACHINE_IDLE_MINUTES',
+  // Audience intelligence + the hiring economics.
+  'X_CLIENT_ID',
+  'X_CLIENT_SECRET',
+  'X_CALLBACK_URL',
+  'FOUNDRY_LABOR_PAYOUT_SHARE',
 ];
 
 /** Reserved prefix — pushed under an alias lib/env.ts also reads. */

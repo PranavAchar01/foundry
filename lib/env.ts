@@ -52,6 +52,21 @@ export const env = {
     return this.brainProvider === 'openai' ? this.openaiModel : this.model;
   },
 
+  // ---- audience intelligence (X) ----
+  get xClientId() {
+    return str('X_CLIENT_ID');
+  },
+  get xClientSecret() {
+    return str('X_CLIENT_SECRET');
+  },
+  get xCallbackUrl() {
+    return str('X_CALLBACK_URL') || `${this.publicUrl}/api/x/callback`;
+  },
+  /** Share of the product price a hired human keeps. */
+  get laborPayoutShare() {
+    return num('FOUNDRY_LABOR_PAYOUT_SHARE', 0.75);
+  },
+
   // ---- money ----
   get stripeSecretKey() {
     return str('STRIPE_SECRET_KEY');
