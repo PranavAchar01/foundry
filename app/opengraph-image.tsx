@@ -42,8 +42,8 @@ export default function OgImage() {
             FOUNDRY.
           </div>
           <div style={{ fontSize: 34, color: '#c3b0dd', marginTop: 20, maxWidth: 900, display: 'flex' }}>
-            An autonomous holding company. It spawns businesses, funds them, reads the P&L, and
-            kills the losers.
+            An autonomous holding company. It reads an audience and builds a business
+            for each person in it.
           </div>
         </div>
         <div

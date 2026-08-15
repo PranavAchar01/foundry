@@ -15,15 +15,6 @@ import ClientRun, { type RunPerson } from './client-run';
  * instead of arriving all at once when the last build finishes.
  */
 
-interface PnL {
-  revenueCents: number;
-  refundCents: number;
-  cogsCents: number;
-  opexCents: number;
-  spendCents: number;
-  netCents: number;
-}
-
 interface Card {
   id: string;
   name: string;
@@ -34,7 +25,6 @@ interface Card {
   visitors: number;
   conversions: number;
   kill_reason: string | null;
-  pnl: PnL;
   cacUsd: number | null;
   /** The person this was built for; empty when it belongs to nobody in particular. */
   prospectUsername: string;
@@ -52,11 +42,7 @@ interface Decision {
 interface Payload {
   generatedAt: string;
   businesses: Card[];
-  pnl: PnL;
   budget: {
-    totalBudgetUsd: number;
-    spentUsd: number;
-    remainingUsd: number;
     breakerEnabled: boolean;
     breaker: { tripped: boolean; reason: string };
   };
@@ -69,8 +55,6 @@ interface MachineLite {
   status: string;
   previewUrl: string;
 }
-
-const usd = (cents: number | string) => `$${(Math.abs(Number(cents)) / 100).toFixed(2)}`;
 
 const STATUS: Record<Card['status'], string> = {
   // Solid peach = earning, outline peach = still being tested, flat violet = dead.
@@ -155,7 +139,7 @@ export default function Dashboard() {
     );
   }
 
-  const { pnl, budget } = data;
+  const { budget } = data;
   const live = data.businesses.filter((b) => b.status !== 'KILLED');
 
   /*
@@ -231,21 +215,15 @@ export default function Dashboard() {
         </div>
       </section>
 
-      {/* ---- the money bar: a slim ledger line under the painting ---- */}
+      {/* A slim status line under the painting. The company's own P&L is kept
+          off the dashboard; what belongs here is whether it is running. */}
       <div className="border-b border-[var(--color-line)]">
         <div className="mx-auto flex max-w-[1500px] flex-wrap items-center gap-x-7 gap-y-2 px-6 py-4 font-mono">
+          <Figure label="companies" value={String(data.businesses.length)} />
           <Figure
-            label="revenue"
-            value={usd(pnl.revenueCents)}
-            tone={pnl.revenueCents > 0 ? 'acc' : 'default'}
+            label="machines"
+            value={String(machines.filter((m) => m.status === 'active').length)}
           />
-          <Figure label="spend" value={`−${usd(pnl.spendCents)}`} />
-          <Figure
-            label="net"
-            value={`${pnl.netCents < 0 ? '−' : ''}${usd(pnl.netCents)}`}
-            tone={pnl.netCents >= 0 ? 'acc' : 'red'}
-          />
-          <Figure label="budget left" value={`$${budget.remainingUsd.toFixed(2)}`} sub={`of $${budget.totalBudgetUsd}`} />
           <span className="ml-auto flex items-center gap-2 text-[11px] text-[var(--color-dim)]">
             <span
               className={`inline-block h-1.5 w-1.5 rounded-full ${
@@ -488,11 +466,6 @@ function Tile({
           <dl className="mt-3 grid grid-cols-3 gap-2 font-mono text-[11px]">
             <Cell label="visits" value={String(card.visitors)} />
             <Cell label="sales" value={String(card.conversions)} />
-            <Cell
-              label="net"
-              value={`${card.pnl.netCents < 0 ? '−' : ''}${usd(card.pnl.netCents)}`}
-              tone={card.pnl.netCents >= 0 ? 'acc' : 'muted'}
-            />
           </dl>
         ) : (
           person && (
