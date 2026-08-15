@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/PranavAchar01/foundry/security/advisories/new
+    about: Report privately. Please do not open a public issue for a security problem.
+  - name: Question or idea
+    url: https://github.com/PranavAchar01/foundry/discussions
+    about: Ask about how something works, or float an idea before building it.

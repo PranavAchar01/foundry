@@ -2,7 +2,7 @@
   "name": "foundry",
   "version": "1.0.0",
   "private": true,
-  "description": "FOUNDRY — an autonomous holding company that spawns, funds, measures, and kills micro-businesses.",
+  "description": "FOUNDRY \u2014 an autonomous holding company that spawns, funds, measures, and kills micro-businesses.",
   "packageManager": "pnpm@11.20.0",
   "scripts": {
     "dev": "next dev",
@@ -46,5 +46,15 @@
   },
   "engines": {
     "node": ">=20"
-  }
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PranavAchar01/foundry.git"
+  },
+  "homepage": "https://foundry-biz-eight.vercel.app",
+  "bugs": {
+    "url": "https://github.com/PranavAchar01/foundry/issues"
+  },
+  "author": "Pranav Achar"
 }
