@@ -1,5 +1,5 @@
 import * as personal from '@/lib/personal';
-import { hireForSegment, listingFor } from '@/lib/hiring';
+import { listingFor, postListing } from '@/lib/hiring';
 import { env } from '@/lib/env';
 import { spawn } from '@/lib/spawn';
 import { slugify } from '@/lib/agent';
@@ -53,6 +53,7 @@ export async function POST(req: Request) {
           decision: posted.decision,
           reason: posted.reason,
           opportunityId: posted.opportunity_id,
+          dashboardUrl: null,
           provider: 'terac',
           targetPayoutCents: posted.target_payout_cents,
           quotedCents: posted.quoted_cents,
@@ -127,29 +128,18 @@ export async function POST(req: Request) {
      * that is already deployed and taking payment. The decision is recorded
      * either way, and `hire` reports which it was.
      */
-    const hire = await hireForSegment({
-      segmentId: null,
-      businessId: spawned.businessId,
-      role: `${niche.name} consultant`,
+    const hire = await postListing({
+      businessId: spawned.businessId!,
+      productName: niche.name,
+      role: 'consultant',
       deliverable:
         `Produce this month's "${niche.offer}" for subscribers to ${niche.name}. ` +
         `They are ${niche.targetCustomer}.`,
       expertProfile: `Practitioner with direct working experience in: ${niche.targetCustomer}`,
       productPriceCents: niche.priceCents,
-      billing: 'subscription',
       subscriberTarget: env.subscriberTarget,
       cycleId: runId,
-    }).catch((err: unknown) => ({
-      decision: 'declined' as const,
-      reason: `labor marketplace unavailable: ${errorMessage(err).slice(0, 160)}`,
-      listingId: '',
-      code: 'HIRE_FAILED',
-      targetPayoutCents: 0,
-      quotedCents: null,
-      opportunityId: null,
-      provider: 'none',
-      decisionId: '',
-    }));
+    });
 
     /*
      * Write the opener now, while the site it quotes is fresh. Sending is a
@@ -168,6 +158,7 @@ export async function POST(req: Request) {
         decision: hire.decision,
         reason: hire.reason,
         opportunityId: hire.opportunityId,
+        dashboardUrl: hire.dashboardUrl,
         provider: hire.provider,
         targetPayoutCents: hire.targetPayoutCents,
         quotedCents: hire.quotedCents,

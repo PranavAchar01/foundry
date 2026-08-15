@@ -35,7 +35,13 @@ export class TeracProvider implements LaborProvider {
     expertProfile: string,
     opts: LaborQuoteOptions = {},
   ): Promise<LaborQuote> {
-    const timelineHours = opts.timelineHours ?? 2;
+    /*
+     * 72 is Terac's floor, not a preference: it rejects anything shorter with
+     * "Number must be greater than or equal to 72". The old default of 2 made
+     * every quote a 400, which surfaced as "could not price the listing" and
+     * read like an economics decision rather than a malformed request.
+     */
+    const timelineHours = opts.timelineHours ?? 72;
     const submissionCount = opts.submissionCount ?? 1;
 
     const q: Quote = await this.c().createQuote({
