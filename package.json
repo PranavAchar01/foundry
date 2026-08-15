@@ -18,10 +18,12 @@
     "smoke": "node scripts/smoke.mjs",
     "go-live": "node scripts/go-live.mjs",
     "verify:terac": "node scripts/verify-terac.mjs",
-    "verify:all": "node scripts/verify-all.mjs"
+    "verify:all": "node scripts/verify-all.mjs",
+    "band:register": "node scripts/band-register.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.0",
+    "@superserve/sdk": "^0.8.2",
     "@vercel/sandbox": "^3.0.0",
     "next": "15.5.23",
     "pg": "^8.16.3",

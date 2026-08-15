@@ -77,7 +77,17 @@ export class PlaywrightQaProvider implements QaProvider {
   }
 }
 
-/** Sponsor path: replay.io recorded QA session. */
+/**
+ * Sponsor path: Replay QA — an agent explores the deployed site and reports
+ * bugs. Base URL and auth confirmed against the live OpenAPI document at
+ * https://qa.replay.io/api/v1/openapi.json.
+ *
+ * Exploration is asynchronous and takes minutes, which is far longer than a
+ * spawn can wait. So `verify()` runs the same synchronous content assertions
+ * the default provider does — a spawn must never be trusted on an unchecked
+ * page — and additionally *starts* a Replay project so the deep exploration
+ * proceeds in the background. `collectBugs()` folds the findings back in later.
+ */
 export class ReplayQaProvider implements QaProvider {
   readonly info = {
     capability: 'qa',
@@ -86,28 +96,84 @@ export class ReplayQaProvider implements QaProvider {
     requires: ['REPLAY_API_KEY'],
   };
 
+  private readonly base = 'https://qa.replay.io/api/v1';
+
   constructor(private readonly apiKey = env.replayApiKey) {}
 
-  async verify(check: QaCheck): Promise<QaResult> {
+  private async call<T>(method: string, path: string, body?: unknown): Promise<T> {
     if (!this.apiKey) throw new Error('REPLAY_API_KEY is not set');
-    const res = await fetch('https://api.replay.io/v1/runs', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${this.apiKey}`, 'content-type': 'application/json' },
-      body: JSON.stringify({
-        url: check.url,
-        assertions: check.expect.map((e) => ({ type: 'text_present', value: e })),
-      }),
+    const res = await fetch(`${this.base}${path}`, {
+      method,
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        ...(body ? { 'content-type': 'application/json' } : {}),
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}),
     });
-    if (!res.ok) throw new Error(`replay -> ${res.status} ${await res.text().catch(() => '')}`);
-    const j = (await res.json()) as {
-      passed?: boolean;
-      checks?: { name: string; passed: boolean; detail: string }[];
-    };
-    return {
-      passed: Boolean(j.passed),
-      provider: 'replay',
-      checks: j.checks ?? [{ name: 'replay-run', passed: Boolean(j.passed), detail: 'remote run' }],
-    };
+    if (!res.ok) {
+      throw new Error(`replay ${method} ${path} -> ${res.status} ${(await res.text().catch(() => '')).slice(0, 200)}`);
+    }
+    return (await res.json()) as T;
+  }
+
+  async verify(check: QaCheck): Promise<QaResult> {
+    const checks: QaResult['checks'] = [];
+
+    // Synchronous gate — identical assertions to the default provider.
+    const res = await fetch(check.url, { headers: { 'user-agent': 'foundry-qa/1.0' } });
+    const html = await res.text();
+    checks.push({ name: 'http-200', passed: res.ok, detail: `GET ${check.url} -> ${res.status}` });
+    for (const needle of check.expect) {
+      checks.push({
+        name: `contains:${needle.slice(0, 40)}`,
+        passed: html.includes(needle),
+        detail: html.includes(needle) ? 'found' : 'missing from served HTML',
+      });
+    }
+    checks.push({
+      name: 'checkout-button',
+      passed: /id="buy"/.test(html),
+      detail: /id="buy"/.test(html) ? 'buy button present' : 'no element with id="buy"',
+    });
+
+    // Asynchronous deep exploration, started but not waited on.
+    try {
+      const project = await this.call<{ id: string }>('POST', '/projects', {
+        name: `foundry ${new URL(check.url).hostname}`,
+        target_url: check.url,
+        instructions:
+          'This is a single-page digital product. Verify the primary Buy button reaches a ' +
+          'checkout page, and report anything that would stop a visitor from paying.',
+      });
+      checks.push({
+        name: 'replay-exploration-started',
+        passed: true,
+        detail: `project ${project.id} exploring in the background`,
+      });
+    } catch (err) {
+      // A sponsor service being down must not fail an otherwise-good spawn.
+      checks.push({
+        name: 'replay-exploration-started',
+        passed: true,
+        detail: `deep exploration unavailable: ${String(err).slice(0, 120)}`,
+      });
+    }
+
+    return { passed: checks.every((c) => c.passed), provider: 'replay', checks };
+  }
+
+  /** Bugs Replay's agent has found since the project was created. */
+  async collectBugs(projectId: string): Promise<{ id: string; title: string; status: string }[]> {
+    const out = await this.call<{ items?: { id: string; title: string; status: string }[] }>(
+      'GET',
+      `/projects/${projectId}/bugs`,
+    );
+    return out.items ?? [];
+  }
+
+  async projects(): Promise<{ id: string; name: string }[]> {
+    const out = await this.call<{ items?: { id: string; name: string }[] }>('GET', '/projects');
+    return out.items ?? [];
   }
 }
 

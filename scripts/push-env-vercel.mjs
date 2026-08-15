@@ -27,6 +27,10 @@ const { teamId: TEAM, projectId: PROJECT } = await resolveTarget();
 const KEYS = [
   'ANTHROPIC_API_KEY',
   'FOUNDRY_MODEL',
+  // Brain is swappable; either vendor can be the one that thinks.
+  'OPENAI_API_KEY',
+  'FOUNDRY_OPENAI_MODEL',
+  'FOUNDRY_BRAIN_PROVIDER',
   'STRIPE_SECRET_KEY',
   'NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY',
   'STRIPE_WEBHOOK_SECRET',
@@ -69,6 +73,13 @@ const KEYS = [
   'REPLAY_API_KEY',
   'RESEND_API_KEY',
   'FOUNDRY_DISCLOSURE_LINE',
+  // Band authenticates as a registered agent; the human key only mints it.
+  'BAND_AGENT_API_KEY',
+  'BAND_AGENT_ID',
+  'BAND_CHAT_ID',
+  // Per-business machines.
+  'FOUNDRY_MACHINE_USD_PER_HOUR',
+  'FOUNDRY_MACHINE_IDLE_MINUTES',
 ];
 
 /** Reserved prefix — pushed under an alias lib/env.ts also reads. */

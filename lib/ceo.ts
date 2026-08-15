@@ -6,6 +6,8 @@ import { authorizeSpend, breakerState, budgetSnapshot, enforceBreaker } from './
 import { collectAnswers, escalate, shouldEscalate } from './escalation';
 import { judge } from './agent';
 import { spawn } from './spawn';
+import * as machine from './machine';
+import { operate } from './operator';
 import { laborProvider, busProvider } from './providers';
 
 /**
@@ -161,6 +163,8 @@ export async function runCycle(opts: CycleOptions = {}): Promise<CycleResult> {
 
     if (j.action === 'KILL') {
       await businesses.kill(card.id, j.reasoning);
+      // A killed business must stop costing money: its machine goes with it.
+      await machine.kill(card.id, j.reasoning).catch(() => false);
       const row = await decisions.record({
         cycleId,
         businessId: card.id,
@@ -285,6 +289,49 @@ export async function runCycle(opts: CycleOptions = {}): Promise<CycleResult> {
         decisionId: row.id, model: 'guardrail', spentUsd: 0,
       });
     }
+  }
+
+  // --- 3b. one operator session, on the least-recently-worked business ------
+  // One per cycle keeps the cycle inside Vercel's 300s function ceiling; over
+  // successive cycles every business gets worked in turn.
+  if (env.superserveApiKey) {
+    try {
+      const machines = await machine.list();
+      const candidates = (await businesses.portfolio()).filter(
+        (c) => c.status !== 'KILLED' && machines.some((m) => m.business_id === c.id),
+      );
+      const oldest = machines
+        .filter((m) => candidates.some((c) => c.id === m.business_id))
+        .sort((a, b) => new Date(a.last_used_at).getTime() - new Date(b.last_used_at).getTime())[0];
+
+      const target = candidates.find((c) => c.id === oldest?.business_id);
+      if (target) {
+        const session = await operate(businesses.toMetrics(target), { cycleId });
+        steps.push({
+          businessId: target.id,
+          action: 'OPERATOR_SESSION',
+          reasoning: session.summary,
+          decisionId: session.decisionId,
+          model: session.model,
+          spentUsd: 0,
+        });
+      }
+    } catch (err) {
+      const row = await decisions.record({
+        cycleId,
+        action: 'OPERATOR_FAILED',
+        reasoning: `Operator session could not run: ${String(err).slice(0, 300)}`,
+        confidence: 1,
+        model: 'guardrail',
+      });
+      steps.push({
+        businessId: null, action: 'OPERATOR_FAILED', reasoning: row.reasoning,
+        decisionId: row.id, model: 'guardrail', spentUsd: 0,
+      });
+    }
+
+    // Bill elapsed machine time and pause anything idle.
+    await machine.meterAndPark().catch(() => ({ billed: 0, paused: 0 }));
   }
 
   // --- 4. latch the breaker if this cycle exhausted the budget --------------

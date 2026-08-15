@@ -8,6 +8,7 @@
  */
 
 import { env } from '@/lib/env';
+import { BRAIN_IMPLEMENTATIONS, brain } from '@/lib/brain';
 import { LABOR_IMPLEMENTATIONS, laborProvider } from './labor';
 import { PAGEGEN_IMPLEMENTATIONS, pagegenProvider } from './pagegen';
 import { CHECKOUT_IMPLEMENTATIONS, checkoutProvider } from './checkout';
@@ -39,6 +40,13 @@ export interface CapabilityEntry {
 }
 
 export const REGISTRY: CapabilityEntry[] = [
+  {
+    capability: 'brain',
+    flag: 'FOUNDRY_BRAIN_PROVIDER',
+    default: 'anthropic',
+    implementations: BRAIN_IMPLEMENTATIONS as unknown as Record<string, () => Capability>,
+    active: () => env.brainProvider,
+  },
   {
     capability: 'labor',
     flag: 'LABOR_PROVIDER',
@@ -128,6 +136,7 @@ export function describeProviders(): CapabilityStatus[] {
 /** Every capability resolved to its currently-selected implementation. */
 export function providers() {
   return {
+    brain: brain(),
     labor: laborProvider(),
     pagegen: pagegenProvider(),
     checkout: checkoutProvider(),

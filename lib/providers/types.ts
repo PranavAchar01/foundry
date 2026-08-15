@@ -93,8 +93,21 @@ export interface PageSpec {
 }
 
 export interface GeneratedPage {
+  /**
+   * The page markup, when the provider produces a deployable artefact.
+   * Empty when the provider hosts the site itself and never hands back source
+   * (Lovable builds and serves a full app rather than returning a file).
+   */
   html: string;
   provider: string;
+  /**
+   * Set when the provider has already published the site. `spawn` then uses
+   * this as the business URL and skips the HostProvider entirely — deploying a
+   * copy would give the business a second, divergent storefront.
+   */
+  hostedUrl?: string;
+  /** The provider's own id for the built project, for later edits. */
+  projectId?: string;
 }
 
 export interface PagegenProvider extends Capability {

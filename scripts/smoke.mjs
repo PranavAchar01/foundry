@@ -40,7 +40,7 @@ console.log(dim(`smoke target: ${BASE}\n`));
   check('/api/health responds', res.status === 200 || res.status === 503, `status ${res.status}`);
   check('database reachable from production', json?.checks?.database?.ok === true, json?.checks?.database?.detail);
   check('stripe configured in production', json?.checks?.stripe?.ok === true, json?.checks?.stripe?.detail);
-  check('anthropic configured in production', json?.checks?.anthropic?.ok === true, json?.checks?.anthropic?.detail);
+  check('brain configured in production', json?.checks?.brain?.ok === true, json?.checks?.brain?.detail);
   check('circuit breaker armed', json?.checks?.circuitBreaker?.ok === true, json?.checks?.circuitBreaker?.detail);
 }
 
@@ -60,7 +60,7 @@ console.log(dim(`smoke target: ${BASE}\n`));
   const res = await fetch(`${BASE}/api/providers`);
   const json = await res.json().catch(() => ({}));
   const caps = json?.capabilities ?? [];
-  check('/api/providers lists 8 capabilities', caps.length === 8,
+  check('/api/providers lists 9 capabilities', caps.length === 9,
     caps.map((c) => `${c.capability}=${c.active}`).join(' '));
   check('every capability has an active implementation',
     caps.every((c) => c.options.some((o) => o.isActive)));

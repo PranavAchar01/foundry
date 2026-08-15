@@ -13,6 +13,7 @@ import { env } from '@/lib/env';
  */
 
 const EXPECTED: Record<string, { flag: string; default: string; options: string[] }> = {
+  brain: { flag: 'FOUNDRY_BRAIN_PROVIDER', default: 'anthropic', options: ['anthropic', 'openai'] },
   labor: { flag: 'LABOR_PROVIDER', default: 'stub', options: ['terac', 'stub'] },
   pagegen: { flag: 'FOUNDRY_PAGEGEN_PROVIDER', default: 'internal', options: ['internal', 'lovable'] },
   checkout: { flag: 'FOUNDRY_CHECKOUT_PROVIDER', default: 'stripe', options: ['stripe', 'whop', 'dodo'] },
@@ -24,7 +25,7 @@ const EXPECTED: Record<string, { flag: string; default: string; options: string[
 };
 
 describe('provider registry', () => {
-  it('covers every sponsor capability declared in .env.local', () => {
+  it('covers every swappable capability, including the brain', () => {
     expect(REGISTRY.map((r) => r.capability).sort()).toEqual(Object.keys(EXPECTED).sort());
   });
 
@@ -49,6 +50,8 @@ describe('provider registry', () => {
 
   it('exposes every capability method the callers use', () => {
     const active = providers();
+    expect(typeof active.brain.structured).toBe('function');
+    expect(typeof active.brain.converse).toBe('function');
     expect(typeof active.labor.quote).toBe('function');
     expect(typeof active.labor.purchase).toBe('function');
     expect(typeof active.labor.poll).toBe('function');
@@ -66,7 +69,7 @@ describe('provider registry', () => {
     for (const entry of REGISTRY) {
       const fallback = entry.implementations[entry.default]();
       const sponsorKeys = fallback.info.requires.filter(
-        (r) => !['POSTGRES_URL', 'STRIPE_SECRET_KEY', 'VERCEL_TOKEN', 'VERCEL_PROJECT_ID', 'VERCEL_TEAM_ID', 'RESEND_API_KEY'].includes(r),
+        (r) => !['POSTGRES_URL', 'STRIPE_SECRET_KEY', 'VERCEL_TOKEN', 'VERCEL_PROJECT_ID', 'VERCEL_TEAM_ID', 'RESEND_API_KEY', 'ANTHROPIC_API_KEY'].includes(r),
       );
       expect(sponsorKeys, `${entry.capability} default ${entry.default}`).toEqual([]);
     }

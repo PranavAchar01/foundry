@@ -1,5 +1,5 @@
-import Anthropic from '@anthropic-ai/sdk';
 import { env } from './env';
+import { AnthropicBrain, OpenAiBrain, brain, type Brain, type ToolSpec } from './brain';
 
 /**
  * The brain. Claude decides what to launch and what to kill; everything else in
@@ -12,16 +12,6 @@ import { env } from './env';
  * reasoning came from the model when it did not.
  */
 
-let client: Anthropic | null = null;
-
-function anthropic(): Anthropic {
-  if (!client) {
-    if (!env.anthropicApiKey) throw new Error('ANTHROPIC_API_KEY is not set');
-    client = new Anthropic({ apiKey: env.anthropicApiKey, maxRetries: 2 });
-  }
-  return client;
-}
-
 export const HEURISTIC = 'heuristic-fallback';
 
 interface ToolCallResult<T> {
@@ -32,34 +22,46 @@ interface ToolCallResult<T> {
   error?: string;
 }
 
+/**
+ * Ask whichever brain is configured for one forced tool call.
+ *
+ * If the active brain fails — a credit balance running out is the case that
+ * actually happened — the other configured brain is tried before falling back
+ * to the heuristic, so one vendor's billing cannot stop the portfolio.
+ */
 async function callTool<T>(
   system: string,
   prompt: string,
-  tool: { name: string; description: string; input_schema: Anthropic.Tool.InputSchema },
+  tool: ToolSpec,
   fallback: () => T,
   maxTokens = 1600,
 ): Promise<ToolCallResult<T>> {
-  try {
-    const res = await anthropic().messages.create({
-      model: env.model,
-      max_tokens: maxTokens,
-      system,
-      tools: [tool],
-      tool_choice: { type: 'tool', name: tool.name },
-      messages: [{ role: 'user', content: prompt }],
-    });
+  const primary = brain();
+  const errors: string[] = [];
 
-    const block = res.content.find((c) => c.type === 'tool_use');
-    if (!block || block.type !== 'tool_use') throw new Error('model returned no tool_use block');
-    return { value: block.input as T, model: res.model, fromModel: true };
-  } catch (err) {
-    return {
-      value: fallback(),
-      model: HEURISTIC,
-      fromModel: false,
-      error: String(err instanceof Error ? err.message : err).slice(0, 300),
-    };
+  for (const candidate of [primary, ...alternates(primary.info.name)]) {
+    try {
+      const out = await candidate.structured<T>({ system, prompt, tool, maxTokens });
+      return { value: out.value, model: out.model, fromModel: true };
+    } catch (err) {
+      errors.push(`${candidate.info.name}: ${String(err instanceof Error ? err.message : err).slice(0, 140)}`);
+    }
   }
+
+  return {
+    value: fallback(),
+    model: HEURISTIC,
+    fromModel: false,
+    error: errors.join(' | ').slice(0, 400),
+  };
+}
+
+/** Configured brains other than the active one, in preference order. */
+function alternates(activeName: string): Brain[] {
+  const out: Brain[] = [];
+  if (activeName !== 'openai' && env.openaiApiKey) out.push(new OpenAiBrain());
+  if (activeName !== 'anthropic' && env.anthropicApiKey) out.push(new AnthropicBrain());
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -79,14 +81,10 @@ export interface Hypothesis {
   reasoning: string;
 }
 
-const HYPOTHESIS_TOOL: {
-  name: string;
-  description: string;
-  input_schema: Anthropic.Tool.InputSchema;
-} = {
+const HYPOTHESIS_TOOL: ToolSpec = {
   name: 'propose_business',
   description: 'Propose one concrete, immediately-launchable digital micro-business.',
-  input_schema: {
+  schema: {
     type: 'object',
     properties: {
       name: { type: 'string', description: 'Product name. 1-4 words, no generic filler.' },
@@ -228,14 +226,10 @@ export interface BusinessMetrics {
   cacUsd: number | null;
 }
 
-const JUDGEMENT_TOOL: {
-  name: string;
-  description: string;
-  input_schema: Anthropic.Tool.InputSchema;
-} = {
+const JUDGEMENT_TOOL: ToolSpec = {
   name: 'allocate',
   description: 'Decide what to do with one business in the portfolio this cycle.',
-  input_schema: {
+  schema: {
     type: 'object',
     properties: {
       action: {
