@@ -22,6 +22,9 @@ export interface BusinessRow {
   subscriber_target: number;
   kill_reason: string | null;
   killed_at: string | null;
+  /** The person this was built for. Empty when it was built for a segment. */
+  prospect_username: string;
+  prospect_bio: string;
   meta: Record<string, unknown>;
   created_at: string;
   updated_at: string;
@@ -115,6 +118,8 @@ export interface PortfolioCard extends BusinessRow {
   /** Customer acquisition cost: total spend / conversions. null with no conversions. */
   cacUsd: number | null;
   conversionRate: number;
+  /** Whose business this is. Empty string for a segment-built one. */
+  prospectUsername: string;
 }
 
 export async function portfolio(): Promise<PortfolioCard[]> {
@@ -130,6 +135,9 @@ export async function portfolio(): Promise<PortfolioCard[]> {
       pnl,
       cacUsd: b.conversions > 0 ? round2(dollars(pnl.spendCents) / b.conversions) : null,
       conversionRate: b.visitors > 0 ? b.conversions / b.visitors : 0,
+      // The column is snake_case because the row is; the card is what the
+      // dashboard reads, and every other computed field on it is camelCase.
+      prospectUsername: b.prospect_username,
     };
   });
 }

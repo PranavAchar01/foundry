@@ -75,7 +75,7 @@ export function renderTemplate(spec: PageSpec): string {
     <h1>${esc(spec.name)}</h1>
     <p class="tagline">${esc(spec.tagline)}</p>
     <div class="cta">
-      <span class="price">$${price}<span>one-time</span></span>
+      <span class="price">$${price}<span>per ${esc(env.billingInterval)}</span></span>
       <button id="buy" type="button">Get it now</button>
     </div>
     <div class="err" id="err" role="alert"></div>
@@ -167,18 +167,38 @@ export class InternalPagegenProvider implements PagegenProvider {
  * spawned storefront and the holding company. The wording is deliberately
  * imperative and literal — this prompt was iterated against the live agent
  * until the built page drove a real Stripe session end to end.
+ *
+ * The art direction is long because an unguided model converges on the same
+ * pastel SaaS template every time, and these pages are shown eight at once in
+ * one grid. Sameness across siblings is the failure mode worth spending
+ * prompt on, so the brief forces a decision per niche and then bans the
+ * defaults by name.
  */
 export function lovableBrief(spec: PageSpec): string {
-  return `Build a single-page marketing landing page for a real product. Keep it to one page, no routing, no auth, no backend.
+  // Present only on the per-person path; the segment path has no single buyer
+  // to write to and this section drops out entirely.
+  const buyer =
+    spec.prospectBio || spec.prospectChore
+      ? `
+THE BUYER — this page is for one working person, not a market:
+${spec.prospectBio ? `\nThey describe their own work like this:\n  ${spec.prospectBio}\n` : ''}${spec.prospectChore ? `\nThe repeating chore this product takes off their week:\n  ${spec.prospectChore}\n` : ''}
+Write every line of copy to that person and nobody else. Use the nouns their
+trade actually uses — the tools, the units, the parts of the week that come
+round again. If a sentence would read the same to a general business audience,
+it is the wrong sentence.
+`
+      : '';
+
+  return `Build a single-page marketing landing page for a real product that takes real money the moment it is live. Keep it to one page, no routing, no auth, no backend.
 
 PRODUCT
 - Name: ${spec.name}
 - For: ${spec.targetCustomer}
 - Tagline: ${spec.tagline}
-- Price: $${(spec.priceCents / 100).toFixed(2)} one-time
+- Price: $${(spec.priceCents / 100).toFixed(2)} per ${env.billingInterval}, recurring
 - What the buyer gets: ${spec.offer}
 ${spec.bullets.length ? `- Key points:\n${spec.bullets.map((b) => `  * ${b}`).join('\n')}` : ''}
-
+${buyer}
 REQUIRED BEHAVIOUR — this must be exact, because a payment system depends on it:
 
 1. The primary call-to-action must be a <button> with the literal attribute id="buy" and visible text "Get it now".
@@ -198,32 +218,72 @@ CONTENT RULES — do not violate these:
 - No guarantees of results, income, or outcomes.
 - Nothing aimed at minors.
 - Do not invent testimonials, customer logos, user counts, or review scores. No fake social proof of any kind.
+- State the price as recurring everywhere it appears. It renews every ${env.billingInterval} and checkout charges it that way; calling it a one-off is a lie the buyer finds at Stripe.
 
-HERO — this is the part that must stand out:
+ART DIRECTION — this is the part that has to be good:
 
-The page opens with a full-viewport hero section, and it has to be the most
-striking thing about the site. It is seen first as a small thumbnail in a wall of
-other companies, so it must read instantly at a glance:
+This page will be seen first as a small thumbnail, in a grid beside seven other
+storefronts built in the same minute for seven other people. Yours has to be
+the one that is obviously not the others.
 
+THE HERO
+- Full viewport, and the most striking thing about the site.
 - The product name as a very large headline — the dominant element on screen.
 - The tagline directly beneath it, one line, clearly secondary.
 - The price and the "Get it now" button both visible without scrolling.
-- A distinctive full-bleed visual treatment behind the text: a bold colour
-  field, gradient, or geometric/CSS-drawn composition. No stock photography and
-  no placeholder image services.
+- A distinctive full-bleed visual treatment behind the text, drawn entirely in
+  CSS or inline SVG: colour fields, type, rules, shapes. No stock photography
+  and no placeholder image services.
+- At 320px wide only silhouette, colour and the shape of the headline survive.
+  Judge it at that size: one dominant element, hard contrast between headline
+  and ground, and a colour nobody building for a different trade would land on.
 
-Choose the palette and typography to suit THIS product and its buyer — a kit for
-wedding photographers should not look like a tool for game developers. Pick one
-strong, saturated accent colour that fits the niche and commit to it. Vary the
-typography with the same intent: a display serif, a heavy geometric sans, or a
-condensed grotesque, whichever matches the audience.
+A COMMITTED IDENTITY
+Design this from inside the buyer's world, not from a landing-page template.
+Decide three things before writing any CSS, then hold to them:
+- Palette — pulled from the materials, light, or printed matter of that trade.
+  One saturated accent, committed to and used with discipline.
+- Type — a display face with a point of view for the name (a high-contrast
+  serif, a condensed grotesque, a heavy geometric, a wood-type slab) paired
+  with one quiet text face. Two families, no more.
+- Composition — borrow the shape of something the buyer already reads: a spec
+  sheet, a call sheet, a menu, a score, a tide table, a shop ticket.
+A kit for wedding photographers and a tool for game developers must not be the
+same page with the hue rotated.
+
+Then say it out loud on the page: one short line of visible text, small, near
+the foot, naming the world the design was drawn from. A designer's note, not a
+disclaimer.
+
+CRAFT — the difference between designed and generated:
+- A real type scale. Sizes step by a consistent ratio, not by guesswork.
+  Headline, tagline and body sit in an obvious hierarchy; nothing competes.
+- Whitespace as a material, spent deliberately — large where you want a pause,
+  tight where things belong together. Even padding everywhere reads as default.
+- An actual grid: columns, consistent gutters, sections aligned to shared
+  edges. Do not centre everything just because centring is the easy answer.
+- One distinctive structural element that carries the page and would look wrong
+  on any other product — an oversized numeral or letterform bled off the edge,
+  a hard diagonal or asymmetric split of the viewport, an editorial rule system
+  (hairlines, running heads, a marginal column of notes), or a motif from the
+  buyer's trade repeated at different scales. Choose one and use it in at least
+  two places so it reads as a system rather than an ornament.
+
+Deliberately do NOT default to the generic SaaS landing page: a centred
+headline slab over a pastel violet-to-blue gradient, a row of three rounded
+feature cards with little line icons, soft shadows on everything, one neutral
+sans at three sizes. That is what this page becomes when nobody decides
+anything, and a wall of them is indistinguishable. If the layout would work
+unchanged for a project management tool, it is the wrong layout here.
 
 Deliberately do NOT default to a dark, monospace, terminal aesthetic — that is
 the house style of the fallback generator and this page must be visually
 distinguishable from it at thumbnail size.
 
 Below the hero, keep it short: the key points, what the buyer receives, and the
-footer disclosure. Mobile responsive throughout.`;
+footer disclosure — all on the same grid and the same type scale as the hero.
+Mobile responsive throughout, and the structural element has to survive the
+narrow layout rather than being hidden below a breakpoint.`;
 }
 
 /**

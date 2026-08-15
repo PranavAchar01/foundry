@@ -410,6 +410,14 @@ ALTER TABLE businesses     ADD COLUMN IF NOT EXISTS tagline    TEXT    NOT NULL 
 ALTER TABLE ledger_entries ADD COLUMN IF NOT EXISTS source     TEXT    NOT NULL DEFAULT 'foundry';
 ALTER TABLE escalations    ADD COLUMN IF NOT EXISTS answer     TEXT;
 
+-- A business built for one named person is not the same object as one built for
+-- a market segment, and the difference has to survive into the portfolio: the
+-- tile has to be able to say whose business this is, and the opener has to be
+-- written against the same bio the product was derived from. Empty means the
+-- business came from a segment, which is still the normal case.
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS prospect_username TEXT NOT NULL DEFAULT '';
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS prospect_bio      TEXT NOT NULL DEFAULT '';
+
 -- ---------------------------------------------------------------------------
 -- Append-only enforcement.
 -- ---------------------------------------------------------------------------

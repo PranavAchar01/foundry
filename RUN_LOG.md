@@ -1016,3 +1016,103 @@ it worked and did not: eight sequential lookups exhausted the per-request quota
 and the failure was swallowed by a `catch`, leaving the bios empty while the
 already-stored user ids made the rows look populated.
 
+## 2026-08-15 — Iteration 25 · one business per person, and a reset that admits what it cannot reach
+
+The run used to pick the strongest audience segment, spawn one business for it,
+and DM eight people about that one business. It is now eight runs in parallel:
+each allowlisted person gets a business built from their own bio, their own tile
+on the wall, and their own DM. The client orchestrates it — `/api/demo/plan`
+once, then `/api/demo/build` and `/api/demo/reach` per person — because a single
+request that built eight storefronts would run past Vercel's 300s ceiling, and
+because tiles that appear one at a time are the thing worth recording.
+
+### The wall was full, which would have produced zero tiles
+
+Twelve active businesses against `FOUNDRY_MAX_BUSINESSES=12`. `spawn()` checks
+`countActive()` before it checks anything else and refuses at the ceiling, so
+the run as it stood would have failed eight times in a row without spending a
+cent or rendering a tile. Clearing the wall is a precondition of the recording,
+not a cosmetic preference.
+
+### What the reset can tear down, and what it cannot
+
+`scripts/reset-portfolio.mjs` reaches twelve paused Superserve machines, six
+`foundry-biz-*` Vercel projects, 559 pageviews, and twelve business rows it
+archives rather than deletes.
+
+It cannot reach seven storefronts. Those were built through Lovable and are
+hosted by Lovable at `foundry-*.lovable.app`, and the MCP surface the pagegen
+provider speaks — `create_project`, `get_project`, `deploy_project` — has no
+delete and no unpublish. Nothing in this repo can take them down. The plan now
+prints all seven URLs under "cannot be torn down from here" and says to remove
+them in the Lovable dashboard, because an operator who reads "reset complete"
+and finds seven live storefronts a day later has been lied to.
+
+Three other things had drifted:
+
+- **A machine that failed to die was recorded as dead.** The DB update that
+  marks a machine killed sat inside `if (SUPERSERVE_API_KEY)`, so with no key
+  the script printed `DONE 0/12 machines destroyed` and left twelve rows live.
+  Worse, when `kill()` threw for any reason the row was marked killed anyway and
+  the error was logged as "already gone" — stopping the meter on a VM that was
+  probably still running. Only a sandbox the provider genuinely no longer knows
+  about is marked killed now; anything else is reported as still billable and
+  the script exits non-zero.
+
+- **`--dry` was not a preview of `--yes`.** It never mentioned the 559 pageviews
+  it deletes, never mentioned the Lovable sites that survive, and counted twelve
+  machines as "to destroy" whether or not there was a key to destroy them with.
+  The plan is computed once and printed identically in both modes.
+
+- **The Vercel sweep was one un-paginated page filtered on the literal string
+  `foundry-biz-`,** not on `VERCEL_PROJECT_PREFIX`. Both fixed, and every
+  Vercel-hosted business is now cross-checked against the doomed set so a
+  storefront whose project would be left running gets named.
+
+The header comment claimed three append-only tables; there are four —
+`conversation_messages` is one too. And archiving frees the business-count
+ceiling but not the budget: `portfolioPnL` deliberately still counts an archived
+business's spend, so $46.33 survives every reset. The plan prints that figure
+rather than letting the next run discover it.
+
+### `scripts/preflight-run.mjs`
+
+One command, one PASS/FAIL line per thing that can kill a live run: Postgres
+reachable and the schema migrated; active
+businesses plus the eight new ones against the ceiling; the breaker unlatched
+and the remaining budget against what eight spawns cost, priced from
+`SPAWN_INFRA_COST_USD` read out of `lib/spawn.ts` so it cannot quote a stale
+number; the allowlist populated with a resolved `x_user_id` and a bio for every
+member; the X credentials, proved with one `GET /2/users/me`; and the Lovable,
+Stripe, Superserve and brain keys. It never follows, never DMs, never refreshes
+a token — a preflight that mutates the credential it is checking can break the
+run it exists to protect.
+
+"Migrated" is read out of `lib/schema.sql` rather than listed in the script —
+every `CREATE TABLE IF NOT EXISTS`, every forward-migration `ADD COLUMN IF NOT
+EXISTS`, every `_append_only` trigger — because a preflight carrying its own
+copy of the schema goes stale the moment someone adds a column, and passes
+while the run dies on it. It found that on the first execution: the per-person
+work added `businesses.prospect_username` and `businesses.prospect_bio`, and
+neither had been applied to the live database. Every build would have failed on
+an unknown column. `node scripts/migrate.mjs` is idempotent and fixes it.
+
+It checks the deployed app too, because the recording drives production and a
+green local preflight against a production that never received the same env is
+the exact failure worth catching.
+
+Two more findings. **`FOUNDRY_PAGEGEN_PROVIDER` is
+`internal` in production and `LOVABLE_API_KEY` is empty**, while the per-person
+art direction is being written into `lovableBrief`. `spawn` catches a pagegen
+failure and falls back to the internal template, so this does not error — it
+quietly ships eight near-identical dark monospace pages, which is the one
+outcome the brief exists to prevent. Preflight fails hard on `pagegen=lovable`
+with no key, and says plainly when the internal template is what will run.
+
+And a second take will not look like the first. `conversation_messages` is
+append-only and `conversations.username` is unique, so the eight conversations
+opened by take one cannot be deleted for take two; `prospect_drafts` is unique
+per username as well. Preflight reports any allowlist member already carrying a
+DM, a draft or a conversation instead of letting the difference show up on
+camera.
+
