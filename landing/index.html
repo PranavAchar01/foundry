@@ -14,10 +14,10 @@
 <link href="https://fonts.googleapis.com/css2?family=Hedvig+Letters+Serif:opsz@12..24&family=Inter:wght@300..700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#241540; --panel:#2e1d4f; --panel-2:#291947; --line:rgba(247,227,211,.14);
+    --bg:#0b0614; --panel:#140c22; --panel-2:#100a1c; --line:rgba(247,227,211,.14);
     --fg:#f7e3d3; --muted:#c3b0dd; --dim:#9680bb;
-    --acc:#ff5fa2; --acc-dim:#3d2a5c; --red:#c3b0dd; --amber:#9680bb;
-    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+    --acc:#ff5fa2; --acc-dim:#1f1433; --red:#c3b0dd; --amber:#9680bb;
+    --mono:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
     --sans:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
     --serif:'Hedvig Letters Serif',Georgia,serif;
   }
@@ -32,36 +32,64 @@
   .wrap{max-width:1080px;margin:0 auto;padding:0 24px;position:relative;z-index:1}
 
   /* nav */
-  nav{display:flex;align-items:center;justify-content:space-between;padding:22px 0;
-    border-bottom:1px solid var(--line)}
-  .logo{font-family:var(--mono);font-size:14px;letter-spacing:.14em;text-transform:uppercase;
-    display:flex;align-items:center;gap:9px}
+  body > nav{position:sticky;top:0;z-index:30;background:var(--bg)}
+  .navrow{display:flex;align-items:center;justify-content:space-between;padding:18px 0}
+  .logo{font-family:var(--serif);font-size:19px;font-weight:400;letter-spacing:-0.01em;
+    color:var(--fg);display:flex;align-items:center;gap:9px}
   .dot{width:7px;height:7px;border-radius:50%;background:var(--acc);
     box-shadow:0 0 10px var(--acc);animation:pulse 2.2s infinite}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
-  .navmeta{font-family:var(--mono);font-size:12px;color:var(--dim)}
+  .navmeta{font-family:var(--sans);font-size:12px;color:var(--dim)}
 
   /* hero */
-  header{padding:110px 0 90px;position:relative}
-  header::before{content:"";position:absolute;inset:-160px -50vw 0;pointer-events:none;z-index:-1;
-    background:linear-gradient(180deg,rgba(36,21,64,.30),rgba(36,21,64,.84) 62%,#241540 96%),
-    url("hero-foundry.png") center 32%/cover no-repeat}
-  .tag{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;
-    letter-spacing:.1em;text-transform:uppercase;color:var(--acc);border:1px solid var(--acc-dim);
-    background:rgba(255,95,162,.08);padding:6px 12px;border-radius:100px;margin-bottom:28px}
-  h1{font-family:var(--serif);font-size:clamp(40px,6.6vw,76px);line-height:1.04;letter-spacing:-.02em;font-weight:400;
-    max-width:15ch}
-  h1 em{font-style:normal;color:var(--dim)}
-  .sub{margin-top:26px;font-size:clamp(17px,2.1vw,21px);color:var(--muted);max-width:56ch;
-    line-height:1.5}
-  .sub b{color:var(--fg);font-weight:500}
-  .cta{margin-top:40px;display:flex;gap:12px;flex-wrap:wrap;align-items:center}
-  .btn{font-family:var(--mono);font-size:13px;letter-spacing:.03em;text-decoration:none;
+  .hero{position:relative;height:92vh;min-height:540px;background:var(--bg)}
+  .hero-card{position:absolute;left:16px;right:16px;top:0;bottom:0;overflow:hidden;
+    border-radius:24px 24px 0 0}
+  @media(min-width:768px){.hero-card{left:24px;right:24px}}
+  .hero-media{position:absolute;inset:0}
+  .hero-media img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+    object-position:center}
+  .hero-scrim{position:absolute;inset:0;
+    background:linear-gradient(180deg,rgba(11,6,20,.45) 0%,rgba(11,6,20,0) 18%,rgba(11,6,20,0) 60%,rgba(11,6,20,.5) 85%,rgba(11,6,20,.95) 100%)}
+  .hero-content{position:absolute;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;text-align:center;padding:0 24px}
+  .hero-eyebrow{display:inline-flex;align-items:center;gap:8px;font-family:var(--sans);
+    font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#f7e3d3;
+    text-shadow:0 1px 12px rgba(11,6,20,.8);margin-bottom:28px}
+  .hero-title{font-family:var(--serif);font-size:clamp(48px,7.2vw,88px);line-height:1.05;
+    letter-spacing:-.015em;font-weight:400;color:#fff;text-shadow:0 4px 50px rgba(11,6,20,.7)}
+  .hero-title em{font-style:normal;color:#c3b0dd}
+  .cta{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+  .hero-cta{margin-top:38px;justify-content:center}
+  .btn{font-family:var(--sans);font-size:13px;letter-spacing:.03em;text-decoration:none;
     padding:13px 22px;border-radius:8px;border:1px solid var(--line);color:var(--fg);
     transition:.18s;display:inline-block}
   .btn:hover{border-color:var(--dim);transform:translateY(-1px)}
   .btn.p{background:var(--acc);color:#2b0a1c;border-color:var(--acc);font-weight:600}
   .btn.p:hover{background:#ff7ab2;box-shadow:0 6px 24px rgba(255,95,162,.25)}
+  .hero-cta .btn:not(.p){border-color:rgba(247,227,211,.4);color:#f7e3d3;
+    backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);background:rgba(11,6,20,.25)}
+
+  /* statement */
+  .statement{padding:6vh 24px 10vh}
+  .statement .sub{font-family:var(--serif);font-size:clamp(28px,3.4vw,44px);line-height:1.25;
+    color:var(--fg);max-width:30ch;margin:0 auto;text-align:left}
+  .sub b{color:var(--fg);font-weight:500}
+
+  /* hero intro animation */
+  @keyframes heroMediaFade{from{opacity:0;filter:blur(18px)}to{opacity:1;filter:blur(0)}}
+  @keyframes heroMediaZoom{from{transform:scale3d(1.11,1.11,1)}to{transform:scale3d(1,1,1)}}
+  @keyframes heroRiseLg{from{opacity:0;transform:translate3d(0,30px,0) scale3d(.985,.985,1);filter:blur(12px)}to{opacity:1;transform:none;filter:blur(0)}}
+  @keyframes heroRise{from{opacity:0;transform:translate3d(0,12px,0);filter:blur(6px)}to{opacity:1;transform:none;filter:blur(0)}}
+  .intro .hero-media,.intro .hero-title,.intro .hero-eyebrow,.intro .hero-cta{opacity:0}
+  .intro-go .hero-media{animation:heroMediaFade 1s cubic-bezier(.22,1,.36,1) both,heroMediaZoom 2.2s cubic-bezier(.58,.04,.16,1) both}
+  .intro-go .hero-title{animation:heroRiseLg 1.05s cubic-bezier(.22,1,.36,1) .42s both}
+  .intro-go .hero-eyebrow{animation:heroRise .8s cubic-bezier(.22,1,.36,1) 1.08s both}
+  .intro-go .hero-cta{animation:heroRise .8s cubic-bezier(.22,1,.36,1) 1.36s both}
+  @media(prefers-reduced-motion:reduce){
+    .intro .hero-media,.intro .hero-title,.intro .hero-eyebrow,.intro .hero-cta{opacity:1}
+    .intro-go .hero-media,.intro-go .hero-title,.intro-go .hero-eyebrow,.intro-go .hero-cta{animation:none}
+  }
 
   /* thesis strip */
   .thesis{border-top:1px solid var(--line);border-bottom:1px solid var(--line);
@@ -132,36 +160,60 @@
     padding:7px 13px;border-radius:6px;background:var(--panel)}
   .chip.host{color:var(--acc);border-color:var(--acc-dim);background:rgba(255,95,162,.08)}
 
-  footer{border-top:1px solid var(--line);padding:40px 0 64px;margin-top:40px}
-  .frow{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;
-    font-family:var(--mono);font-size:11.5px;color:var(--dim)}
+  /* footer slab */
+  .foot-slab{background:#ff5fa2;color:#2b0a1c;border-radius:26px 26px 0 0;overflow:hidden;
+    box-shadow:0 50vh 0 0 #ff5fa2;position:relative;z-index:2;margin-top:40px}
+  .foot-slab a{color:#2b0a1c;text-decoration:none}
+  .foot-slab a:hover{color:#0b0614}
+  .foot-inner{max-width:1520px;margin:0 auto;
+    padding:clamp(40px,5.2vw,76px) clamp(20px,4vw,64px) clamp(18px,2.2vw,30px)}
+  .foot-top{display:flex;flex-wrap:wrap;justify-content:space-between;
+    gap:clamp(30px,4vw,72px)}
+  .foot-mark{font-family:var(--serif);font-size:21px;font-weight:400;margin-bottom:18px}
+  .foot-top h2{font-family:var(--serif);font-weight:400;font-size:clamp(29px,3.4vw,50px);
+    line-height:1.1;letter-spacing:-.01em;color:#2b0a1c;margin-bottom:26px;max-width:16ch}
+  .foot-cta{display:inline-block;background:#0b0614;color:#f7e3d3!important;
+    border-radius:999px;padding:12px 24px;font-weight:600;font-size:14px}
+  .foot-cta:hover{color:#fff!important}
+  .foot-nav{display:flex;flex-direction:column;gap:12px;font-size:15px;font-weight:500}
+  .foot-bottom{border-top:1px solid rgba(43,10,28,.2);padding-top:16px;margin-top:32px;
+    display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;
+    font-size:12px;color:rgba(43,10,28,.68)}
   @media(max-width:640px){
-    header{padding:56px 0 48px}section{padding:56px 0}
+    section{padding:56px 0}
     .stats{gap:16px}.tbody{font-size:11px}
   }
 </style>
 </head>
-<body>
-<div class="wrap">
+<body class="intro">
 
-  <nav>
+<nav>
+  <div class="wrap navrow">
     <div class="logo"><span class="dot"></span>Foundry</div>
     <div class="navmeta">Zero-Human Company Hackathon · SF · 08.15</div>
-  </nav>
+  </div>
+</nav>
 
-  <header>
-    <div class="tag"><span class="dot"></span>Cold start 15:00 PDT — no human input since</div>
-    <h1>The holding company with <em>no employees.</em></h1>
-    <p class="sub">Foundry doesn't run a business. It runs a <b>portfolio</b> of them — generating
-      hypotheses, shipping real products with real checkout, reading the P&amp;L, and killing the
-      losers. Capital gets reallocated every cycle. Nobody signs off.</p>
-    <div class="cta">
-      <a class="btn p" href="#portfolio">See the live portfolio</a>
-      <a class="btn" href="#loop">How the loop works</a>
+<section class="hero">
+  <div class="hero-card">
+    <div class="hero-media"><img src="hero-foundry.png" alt=""></div>
+    <div class="hero-scrim"></div>
+    <div class="hero-content">
+      <div class="hero-eyebrow"><span class="dot"></span>Cold start 15:00 PDT — no human input since</div>
+      <h1 class="hero-title">The holding company with <em>no employees.</em></h1>
+      <div class="cta hero-cta">
+        <a class="btn p" href="#portfolio">See the live portfolio</a>
+        <a class="btn" href="#loop">How the loop works</a>
+      </div>
     </div>
-  </header>
+  </div>
+</section>
 
-</div>
+<section class="statement">
+  <p class="sub">Foundry doesn't run a business. It runs a <b>portfolio</b> of them — generating
+    hypotheses, shipping real products with real checkout, reading the P&amp;L, and killing the
+    losers. Capital gets reallocated every cycle. Nobody signs off.</p>
+</section>
 
 <div class="thesis"><div class="wrap">
   <p>A zero-human company has zero <span class="k">employees</span> — not zero humans.</p>
@@ -312,13 +364,36 @@ revenue lands on. Expertise is a line item, not a headcount.</p>
     </div>
   </section>
 
-  <footer>
-    <div class="frow">
-      <div>Foundry · Zero-Human Company Hackathon by Terac · San Francisco</div>
-      <div>Operated end-to-end by an AI agent. No human wrote the businesses.</div>
-    </div>
-  </footer>
-
 </div>
+
+<footer class="foot-slab">
+  <div class="foot-inner">
+    <div class="foot-top">
+      <div>
+        <div class="foot-mark">Foundry</div>
+        <h2>Companies run by machines, audited by anyone.</h2>
+        <a class="foot-cta" href="https://foundry-biz-eight.vercel.app">See the live portfolio</a>
+      </div>
+      <nav class="foot-nav">
+        <a href="#portfolio">Portfolio</a>
+        <a href="#loop">The loop</a>
+        <a href="https://foundry-biz-eight.vercel.app">Live portfolio ↗</a>
+      </nav>
+    </div>
+    <svg style="display:block;width:100%;height:auto;margin-top:clamp(34px,5vw,60px);fill:#2b0a1c" viewBox="0 0 720 130" aria-hidden="true"><text x="360" y="104" text-anchor="middle" font-size="130" font-family="'Hedvig Letters Serif',Georgia,serif" textLength="700" lengthAdjust="spacingAndGlyphs">FOUNDRY</text></svg>
+    <div class="foot-bottom">
+      <div>Every company here is operated end-to-end by an AI agent. No human runs these businesses.</div>
+      <div>Zero-Human Company Hackathon · SF · 08.15</div>
+    </div>
+  </div>
+</footer>
+
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+  requestAnimationFrame(function(){requestAnimationFrame(function(){
+    document.body.classList.add('intro-go');
+  })});
+});
+</script>
 </body>
 </html>
