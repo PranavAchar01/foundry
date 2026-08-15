@@ -89,7 +89,7 @@ function SiteFrame({ url, title }: { url: string; title: string }) {
   }, []);
 
   return (
-    <div ref={ref} className="relative w-full overflow-hidden bg-white"
+    <div ref={ref} className="relative w-full overflow-hidden bg-[var(--color-panel2)]"
          style={{ height: scale ? SITE_H * scale : 420 }}>
       {scale > 0 && (
         <iframe
@@ -172,7 +172,7 @@ export default function CompanyDetail({ id, onClose }: { id: string; onClose: ()
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/25 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#170c2b]/60 p-4 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
@@ -182,23 +182,23 @@ export default function CompanyDetail({ id, onClose }: { id: string; onClose: ()
         {/* header */}
         <header className="flex items-start justify-between gap-4 border-b border-[var(--color-line)] px-6 py-4">
           <div className="min-w-0">
-            <h2 className="truncate text-lg font-semibold">{b?.name ?? 'loading…'}</h2>
+            <h2 className="truncate text-2xl font-normal">{b?.name ?? 'loading…'}</h2>
             <p className="truncate text-sm text-[var(--color-muted)]">{b?.tagline || b?.niche}</p>
           </div>
           <div className="flex shrink-0 items-center gap-3 font-mono text-[10px]">
             {b?.url && (
-              <a href={b.url} target="_blank" rel="noreferrer" className="text-[var(--color-fg)] underline underline-offset-2 hover:text-[var(--color-muted)]">
+              <a href={b.url} target="_blank" rel="noreferrer" className="text-[var(--color-fg)] underline underline-offset-2 hover:text-[var(--color-acc)]">
                 site ↗
               </a>
             )}
             {m?.previewUrl && (
-              <a href={m.previewUrl} target="_blank" rel="noreferrer" className="text-[var(--color-fg)] underline underline-offset-2 hover:text-[var(--color-muted)]">
+              <a href={m.previewUrl} target="_blank" rel="noreferrer" className="text-[var(--color-fg)] underline underline-offset-2 hover:text-[var(--color-acc)]">
                 machine ↗
               </a>
             )}
             <button
               onClick={onClose}
-              className="rounded-full border border-[var(--color-line)] bg-[var(--color-panel)] px-3.5 py-1.5 text-xs text-[var(--color-muted)] transition hover:bg-[var(--color-accdim)] hover:text-[var(--color-fg)]"
+              className="rounded-full border border-[var(--color-line)] bg-[var(--color-panel)] px-3.5 py-1.5 text-xs text-[var(--color-fg)] transition hover:bg-[var(--color-accdim)]"
             >
               close ✕
             </button>
@@ -239,8 +239,8 @@ export default function CompanyDetail({ id, onClose }: { id: string; onClose: ()
             badge={m?.status ?? ''}
           >
             {m ? (
-              <div className="relative h-full min-h-[420px] bg-black">
-                <pre className="thin-scroll h-full overflow-auto px-4 py-3 font-mono text-[11px] leading-[1.45] whitespace-pre text-white">
+              <div className="relative h-full min-h-[320px] bg-[var(--color-panel2)] lg:min-h-[420px]">
+                <pre className="thin-scroll h-full overflow-auto px-4 py-3 font-mono text-[11px] leading-[1.45] whitespace-pre text-[var(--color-fg)]">
 {console_ ||
   (consoleErr
     ? /conflict|valid state/i.test(consoleErr)
@@ -248,7 +248,7 @@ export default function CompanyDetail({ id, onClose }: { id: string; onClose: ()
       : `! ${consoleErr}`
     : 'connecting to the machine…')}
                 </pre>
-                <span className="absolute right-3 bottom-2 font-mono text-[9.5px] text-white/40">
+                <span className="absolute right-3 bottom-2 font-mono text-[9.5px] text-[var(--color-dim)]">
                   {consoleAt ? `live · ${clock(consoleAt)}` : 'live'}
                 </span>
               </div>
@@ -272,7 +272,7 @@ export default function CompanyDetail({ id, onClose }: { id: string; onClose: ()
                   <div key={r.id} className="mb-2">
                     <div className="flex gap-2">
                       <span className="shrink-0 text-[var(--color-dim)]">{clock(r.created_at)}</span>
-                      <span className={`shrink-0 ${r.exit_code === 0 ? 'text-[var(--color-dim)]' : 'text-[var(--color-fg)] font-semibold'}`}>
+                      <span className={`shrink-0 ${r.exit_code === 0 ? 'text-[var(--color-dim)]' : 'text-[var(--color-acc)] font-semibold'}`}>
                         {r.exit_code === 0 ? '$' : `✗${r.exit_code}`}
                       </span>
                       <span className="break-all whitespace-pre-wrap text-[var(--color-fg)]">
@@ -315,14 +315,14 @@ export default function CompanyDetail({ id, onClose }: { id: string; onClose: ()
 }
 
 const TONE: Record<string, string> = {
-  acc: 'text-[var(--color-fg)] font-medium',
+  acc: 'text-[var(--color-acc)] font-medium',
   red: 'text-[var(--color-muted)]',
   default: 'text-[var(--color-fg)]',
 };
 
 function Metric({ label, value, tone = 'default' }: { label: string; value: string; tone?: string }) {
   return (
-    <div className="bg-[var(--color-bg)] px-4 py-3">
+    <div className="bg-[var(--color-panel2)] px-4 py-3">
       <p className="font-mono text-[9.5px] tracking-wider text-[var(--color-dim)] uppercase">{label}</p>
       <p className={`mt-0.5 font-mono text-lg ${TONE[tone]}`}>{value}</p>
     </div>
@@ -370,7 +370,7 @@ function Pane({
 
 function Empty({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex h-full min-h-[420px] items-center justify-center p-8 text-center text-sm text-[var(--color-dim)]">
+    <div className="flex h-full min-h-[320px] items-center justify-center p-8 text-center text-sm text-[var(--color-dim)] lg:min-h-[420px]">
       {children}
     </div>
   );

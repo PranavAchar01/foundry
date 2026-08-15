@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import CompanyDetail from './detail';
 
@@ -64,9 +65,9 @@ interface MachineLite {
 const usd = (cents: number | string) => `$${(Math.abs(Number(cents)) / 100).toFixed(2)}`;
 
 const STATUS: Record<Card['status'], string> = {
-  // Solid = earning, outline = still being tested, flat grey = dead.
-  SCALING: 'border-transparent bg-[var(--color-fg)] text-white',
-  TESTING: 'border-[var(--color-fg)] bg-white/85 text-[var(--color-fg)]',
+  // Solid peach = earning, outline peach = still being tested, flat violet = dead.
+  SCALING: 'border-transparent bg-[var(--color-fg)] text-[#241540]',
+  TESTING: 'border-[var(--color-fg)] bg-[color:rgba(36,21,64,0.55)] text-[var(--color-fg)]',
   KILLED: 'border-transparent bg-[var(--color-accdim)] text-[var(--color-muted)]',
 };
 
@@ -128,20 +129,42 @@ export default function Dashboard() {
   const live = data.businesses.filter((b) => b.status !== 'KILLED');
 
   return (
-    <main className="mx-auto max-w-[1500px] px-6 py-8">
-      {/* ---- one compact header: identity, money, pulse ---- */}
-      <header className="mb-7 flex flex-wrap items-center justify-between gap-x-8 gap-y-4 border-b border-[var(--color-line)] pb-5">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">
-            FOUNDRY<span className="text-[var(--color-acc)]">.</span>
-          </h1>
-          <p className="mt-0.5 text-[13px] text-[var(--color-muted)]">
-            An autonomous holding company. {live.length} companies, each on its own machine.
-          </p>
+    <main>
+      {/* ---- hero: the painting, the name, dusk melting into the page ---- */}
+      <header className="relative h-[300px] overflow-hidden md:h-[380px]">
+        <Image
+          src="/hero-foundry.png"
+          alt=""
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover"
+        />
+        <div
+          aria-hidden
+          className="absolute inset-0"
+          style={{
+            background: 'linear-gradient(to bottom, rgba(36,21,64,0) 40%, #241540 100%)',
+          }}
+        />
+        <div className="absolute inset-x-0 bottom-0">
+          <div className="mx-auto max-w-[1500px] px-6 pb-6">
+            <h1 className="text-5xl font-normal md:text-6xl">FOUNDRY</h1>
+            <p className="mt-2 text-[13px] text-[var(--color-fg)]">
+              An autonomous holding company. {live.length} companies, each on its own machine.
+            </p>
+          </div>
         </div>
+      </header>
 
-        <div className="flex flex-wrap items-center gap-x-7 gap-y-2 font-mono">
-          <Figure label="revenue" value={usd(pnl.revenueCents)} tone="acc" />
+      {/* ---- the money bar: a slim ledger line under the painting ---- */}
+      <div className="border-b border-[var(--color-line)]">
+        <div className="mx-auto flex max-w-[1500px] flex-wrap items-center gap-x-7 gap-y-2 px-6 py-4 font-mono">
+          <Figure
+            label="revenue"
+            value={usd(pnl.revenueCents)}
+            tone={pnl.revenueCents > 0 ? 'acc' : 'default'}
+          />
           <Figure label="spend" value={`−${usd(pnl.spendCents)}`} />
           <Figure
             label="net"
@@ -149,23 +172,24 @@ export default function Dashboard() {
             tone={pnl.netCents >= 0 ? 'acc' : 'red'}
           />
           <Figure label="budget left" value={`$${budget.remainingUsd.toFixed(2)}`} sub={`of $${budget.totalBudgetUsd}`} />
-          <span className="flex items-center gap-2 text-[11px] text-[var(--color-dim)]">
+          <span className="ml-auto flex items-center gap-2 text-[11px] text-[var(--color-dim)]">
             <span
               className={`inline-block h-1.5 w-1.5 rounded-full ${
-                connected ? 'bg-[var(--color-fg)] pulse' : 'bg-[var(--color-dim)]'
+                connected ? 'bg-[var(--color-acc)] pulse' : 'bg-[var(--color-dim)]'
               }`}
             />
             {connected ? 'live' : 'reconnecting'}
           </span>
         </div>
-      </header>
+      </div>
 
+      <div className="mx-auto max-w-[1500px] px-6 py-8">
       {budget.breaker.tripped && (
-        <div className="mb-6 rounded-2xl border border-[var(--color-fg)] bg-[var(--color-fg)] px-5 py-3">
-          <span className="font-mono text-[11px] tracking-wider text-white uppercase">
+        <div className="mb-6 rounded-2xl border border-[var(--color-line)] bg-[var(--color-fg)] px-5 py-3">
+          <span className="font-mono text-[11px] tracking-wider text-[#241540] uppercase">
             circuit breaker tripped
           </span>
-          <span className="ml-3 text-sm text-white/80">{budget.breaker.reason}</span>
+          <span className="ml-3 text-sm text-[#241540]/80">{budget.breaker.reason}</span>
         </div>
       )}
 
@@ -194,7 +218,7 @@ export default function Dashboard() {
                     </div>
                   )}
                   {b.status === 'KILLED' && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-white/70 text-[11px] font-medium tracking-[0.18em] text-[var(--color-muted)] backdrop-blur-[2px]">
+                    <div className="absolute inset-0 flex items-center justify-center bg-[#241540]/70 text-[11px] font-medium tracking-[0.18em] text-[var(--color-fg)] backdrop-blur-[2px]">
                       KILLED
                     </div>
                   )}
@@ -204,7 +228,7 @@ export default function Dashboard() {
                     {b.status}
                   </span>
                   {m && (
-                    <span className="absolute bottom-2 left-2 rounded-full border border-[var(--color-line)] bg-white/90 px-2 py-0.5 font-mono text-[9px] text-[var(--color-muted)] backdrop-blur-sm">
+                    <span className="absolute bottom-2 left-2 rounded-full border border-[var(--color-line)] bg-[#241540]/80 px-2 py-0.5 font-mono text-[9px] text-[var(--color-muted)] backdrop-blur-sm">
                       {m.status === 'active' ? <span className="pulse text-[var(--color-fg)]">● </span> : '○ '}
                       VM {m.status}
                     </span>
@@ -213,7 +237,7 @@ export default function Dashboard() {
 
                 {/* the three numbers that matter */}
                 <div className="px-4 py-3">
-                  <h3 className="truncate text-sm font-medium">{b.name}</h3>
+                  <h3 className="truncate text-base font-normal">{b.name}</h3>
                   <p className="truncate text-[11px] text-[var(--color-dim)]">{b.niche}</p>
                   <dl className="mt-3 grid grid-cols-3 gap-2 font-mono text-[11px]">
                     <Cell label="visits" value={String(b.visitors)} />
@@ -253,6 +277,7 @@ export default function Dashboard() {
           agent. No human runs these businesses.
         </p>
       </footer>
+      </div>
 
       {open && <CompanyDetail id={open} onClose={() => setOpen(null)} />}
     </main>
@@ -282,7 +307,7 @@ function TilePreview({ url, name }: { url: string; name: string }) {
 }
 
 const TONE: Record<string, string> = {
-  acc: 'text-[var(--color-fg)] font-medium',
+  acc: 'text-[var(--color-acc)] font-medium',
   red: 'text-[var(--color-muted)]',
   muted: 'text-[var(--color-muted)]',
   default: 'text-[var(--color-fg)]',
