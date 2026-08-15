@@ -40,15 +40,28 @@ describe.skipIf(!ENABLED)('machine boot is visible', () => {
     const html = await res.text();
     console.log('  fetch    :', res.status, `${html.length} bytes`);
     expect(res.status).toBe(200);
+    // It names the company it belongs to…
     expect(html).toContain('Boot Co');
     expect(html).toContain(env.disclosureLine);
 
-    // The machine serves its own working files, and updates as the agent works.
-    await machine.run(BUSINESS, 'echo "<h1>rewritten by the operator</h1>" > /root/company/index.html');
+    // …but it is a view of a MACHINE, read live from this VM, not a file index.
+    for (const marker of ['uptime', 'memory', 'disk', 'processes', 'Operator workspace']) {
+      expect(html, `machine page is missing "${marker}"`).toContain(marker);
+    }
+    // Real values, not labels with nothing behind them.
+    expect(html, 'no memory figure').toMatch(/\d+(\.\d+)?\s(MB|GB)/);
+    expect(html, 'no process count').toMatch(/<div class="v">\d+<\/div>/);
+    expect(html, 'not auto-refreshing').toContain('http-equiv="refresh"');
+
+    // The workspace is live: a file the operator writes shows up on the page
+    // and is reachable by path.
+    const marker = `probe-${Date.now().toString(36)}`;
+    await machine.run(BUSINESS, `echo ${marker} >> /root/company/NOTES.md`);
     const after = await fetch(result.machine!.preview_url).then((r) => r.text());
-    expect(after).toContain('rewritten by the operator');
+    expect(after, 'NOTES.md tail is not on the machine page').toContain(marker);
 
     const notes = await fetch(`${result.machine!.preview_url}/NOTES.md`);
     expect(notes.status).toBe(200);
+    expect(await notes.text()).toContain(marker);
   });
 });

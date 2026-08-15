@@ -55,6 +55,9 @@ const clock = (iso: string) => new Date(iso).toLocaleTimeString('en-US', { hour1
 
 export default function CompanyDetail({ id, onClose }: { id: string; onClose: () => void }) {
   const [data, setData] = useState<Detail | null>(null);
+  const [console_, setConsole] = useState<string>('');
+  const [consoleAt, setConsoleAt] = useState<string>('');
+  const [consoleErr, setConsoleErr] = useState<string>('');
 
   useEffect(() => {
     let alive = true;
@@ -67,6 +70,36 @@ export default function CompanyDetail({ id, onClose }: { id: string; onClose: ()
     return () => {
       alive = false;
       clearInterval(timer);
+    };
+  }, [id]);
+
+  // The live OS view: raw stdout from a real command on the real machine.
+  useEffect(() => {
+    let source: EventSource | null = null;
+    let retry: ReturnType<typeof setTimeout> | null = null;
+
+    const connect = () => {
+      source = new EventSource(`/api/company/${id}/console`);
+      source.addEventListener('frame', (ev) => {
+        const f = JSON.parse((ev as MessageEvent).data) as { at: string; text: string };
+        setConsole(f.text);
+        setConsoleAt(f.at);
+        setConsoleErr('');
+      });
+      source.addEventListener('error', (ev) => {
+        const raw = (ev as MessageEvent).data;
+        if (raw) setConsoleErr((JSON.parse(raw) as { message: string }).message);
+      });
+      // The endpoint closes itself before the platform timeout; reconnect.
+      source.onerror = () => {
+        source?.close();
+        retry = setTimeout(connect, 2000);
+      };
+    };
+    connect();
+    return () => {
+      source?.close();
+      if (retry) clearTimeout(retry);
     };
   }, [id]);
 
@@ -154,23 +187,21 @@ export default function CompanyDetail({ id, onClose }: { id: string; onClose: ()
           </Pane>
 
           <Pane
-            title="the machine running the company"
-            sub={m ? `${m.provider} · ${m.status} · $${m.billedUsd.toFixed(2)} of machine time` : 'no machine'}
+            title="the machine running the company · live"
+            sub={m ? `${m.externalId.slice(0, 8)} · ${m.provider} · ${m.status} · $${m.billedUsd.toFixed(2)} of machine time` : 'no machine'}
             badge={m?.status ?? ''}
           >
-            {m?.previewUrl ? (
-              <iframe
-                src={m.previewUrl}
-                title="machine view"
-                className="h-[420px] w-full border-0 bg-white"
-                sandbox="allow-scripts allow-same-origin"
-              />
+            {m ? (
+              <div className="relative h-[420px] bg-black">
+                <pre className="thin-scroll h-full overflow-auto px-4 py-3 font-mono text-[11px] leading-[1.45] whitespace-pre text-white">
+{console_ || (consoleErr ? `! ${consoleErr}` : 'connecting to the machine…')}
+                </pre>
+                <span className="absolute right-3 bottom-2 font-mono text-[9.5px] text-white/40">
+                  {consoleAt ? `live · ${clock(consoleAt)}` : 'live'}
+                </span>
+              </div>
             ) : (
-              <Empty>
-                {m
-                  ? 'This machine is not serving a view right now. It heals on the next cycle.'
-                  : 'No machine attached to this company.'}
-              </Empty>
+              <Empty>No machine attached to this company.</Empty>
             )}
           </Pane>
         </div>
