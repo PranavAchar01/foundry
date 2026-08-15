@@ -5,7 +5,7 @@ deploys it, wires it to checkout, measures real traffic, reads the P&L, and
 either allocates more capital or kills it — on a cron, with no human in the
 loop.
 
-**Live:** https://foundry-biz.vercel.app
+**Live:** https://foundry-biz-eight.vercel.app
 
 Every business it launches carries a visible disclosure that it is AI-operated.
 

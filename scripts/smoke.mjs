@@ -2,13 +2,13 @@
 /**
  * Smoke test against a LIVE deployment. Asserts real content, not just a 200.
  *
- *   node scripts/smoke.mjs [https://foundry-biz.vercel.app]
+ *   node scripts/smoke.mjs [https://foundry-biz-eight.vercel.app]
  */
 import { bad, dim, loadEnv, ok, warn } from './_env.mjs';
 
 loadEnv();
 
-const BASE = (process.argv[2] ?? process.env.FOUNDRY_PUBLIC_URL ?? 'https://foundry-biz.vercel.app')
+const BASE = (process.argv[2] ?? process.env.FOUNDRY_PUBLIC_URL ?? 'https://foundry-biz-eight.vercel.app')
   .replace(/\/$/, '');
 
 let failed = 0;

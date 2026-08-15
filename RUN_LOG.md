@@ -294,3 +294,64 @@ correct and changed nothing. Gate still green — lint, typecheck, build clean,
 30 passed / 1 skipped.
 
 A fresh token is now the only remaining input.
+
+## 2026-08-15 — Iteration 14 · LIVE. Target 1 closed.
+
+Owner supplied a token for a second Vercel account. Checked it before using it:
+
+```
+account : phantom3452 <achar.pranav@gmail.com>
+limited : undefined          <- not limited, unlike the previous account
+teams   : phantom3452s-projects (hobby)  team_vn1kQ3Nf6Q5htDaqBfa17vgi
+```
+
+`pnpm go-live` with a blank team and project id. The resolver discovered the
+team, created the `foundry-biz` project, pushed 35 env vars, and:
+
+```
+PASS  deployment READY
+      https://foundry-biz-eight.vercel.app
+      https://foundry-biz-phantom3452s-projects.vercel.app
+```
+
+`foundry-biz.vercel.app` was already taken globally by the blocked account, so
+Vercel assigned `foundry-biz-eight`. The deploy step detected the mismatch
+against `FOUNDRY_PUBLIC_URL` and printed the retarget command rather than
+leaving a silently half-migrated system.
+
+**Retarget** — every origin-pinned reference moved:
+
+```
+PASS  FOUNDRY_PUBLIC_URL = https://foundry-biz-eight.vercel.app
+PASS  Stripe webhook we_1U4ZK32Nyz5Xb21P440IBTfO repointed
+      https://foundry-biz.vercel.app/api/stripe/webhook
+   -> https://foundry-biz-eight.vercel.app/api/stripe/webhook
+      signing secret unchanged, so STRIPE_WEBHOOK_SECRET still applies
+PASS  GitHub Actions variable FOUNDRY_PUBLIC_URL updated
+```
+
+Then `env:push` + `deploy` again so the runtime serves the new value.
+
+**`pnpm smoke` against the live URL — 21/21 PASS**, including a real
+`cs_live_a1rQgK0Carem…` session, the unsigned-webhook rejection, CORS for
+spawned origins, and the deployed business page's disclosure line.
+
+**Target 10 re-measured on production**, through the live HTTP endpoint rather
+than in-process: `POST /api/spawn` → **21.3s wall clock**, 20.5s server-measured,
+QA passed, and the generated page verified to target the new origin.
+
+**Stale storefronts retired.** Two businesses spawned before the move had the
+dead origin baked into their Buy buttons. Wrote `scripts/retire-stale.mjs`,
+which fetches each live page and retires any whose checkout does not target the
+current origin — with the reason written to the append-only decision log, and a
+`--dry` mode. 2 retired, 1 kept. Replacements spawned through production in
+19.0s and 17.9s.
+
+**CEO loop confirmed running in production.** GitHub Actions run `31877286866`
+→ HTTP 200 in 38s, cycle `cyc_msu6hl012avof3`, 4 steps, $6 of $150 spent:
+three HOLDs each citing the real numbers, and one SPAWN
+(`Steam Launch Checklist`, deployed in 19.4s).
+
+Final gate: lint clean · typecheck clean · build clean · 30 passed / 1 skipped.
+
+**All eleven targets verified.**

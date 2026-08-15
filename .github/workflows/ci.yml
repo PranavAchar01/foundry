@@ -20,7 +20,7 @@ jobs:
       # Non-secret configuration, mirroring .env.local.
       FOUNDRY_MODEL: claude-opus-5
       STRIPE_PAYMENT_METHOD_TYPES: card
-      FOUNDRY_PUBLIC_URL: https://foundry-biz.vercel.app
+      FOUNDRY_PUBLIC_URL: https://foundry-biz-eight.vercel.app
       TERAC_API_BASE: https://terac.com/api/external/v2
       TERAC_ESCALATION_THRESHOLD: '0.65'
       TERAC_MAX_SPEND_USD: '40'

@@ -33,7 +33,7 @@ jobs:
     steps:
       - name: Invoke the CEO loop
         env:
-          BASE: ${{ vars.FOUNDRY_PUBLIC_URL || 'https://foundry-biz.vercel.app' }}
+          BASE: ${{ vars.FOUNDRY_PUBLIC_URL || 'https://foundry-biz-eight.vercel.app' }}
           SECRET: ${{ secrets.CRON_SECRET }}
           NICHE: ${{ inputs.niche }}
         run: |

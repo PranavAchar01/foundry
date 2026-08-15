@@ -81,8 +81,8 @@ const pass = (msg, detail) => {
     'line_items[0][price_data][currency]': 'usd',
     'line_items[0][price_data][unit_amount]': '2900',
     'line_items[0][price_data][product_data][name]': 'Foundry preflight probe',
-    success_url: 'https://foundry-biz.vercel.app/thanks',
-    cancel_url: 'https://foundry-biz.vercel.app/',
+    success_url: 'https://foundry-biz-eight.vercel.app/thanks',
+    cancel_url: 'https://foundry-biz-eight.vercel.app/',
     'metadata[business_id]': 'preflight',
   });
 
@@ -165,17 +165,28 @@ const pass = (msg, detail) => {
 
 // ------------------------------------------------------------------ vercel --
 {
-  const token = process.env.VERCEL_TOKEN;
-  const team = process.env.VERCEL_TEAM_ID;
-  const project = process.env.VERCEL_PROJECT_ID;
   try {
-    const res = await fetch(
-      `https://api.vercel.com/v9/projects/${project}${team ? `?teamId=${team}` : ''}`,
-      { headers: { Authorization: `Bearer ${token}` } },
-    );
-    const json = await res.json();
-    if (res.ok) pass(`vercel project ${json.name} reachable`, `id=${json.id}`);
-    else fail(`vercel project lookup -> ${res.status}`, JSON.stringify(json.error ?? json));
+    // Discovers the team and finds-or-creates the project, so this works
+    // against a fresh account with nothing but a token.
+    const { resolveTarget } = await import('./_vercel.mjs');
+    const { teamId, projectId, projectName } = await resolveTarget();
+
+    const user = await fetch('https://api.vercel.com/v2/user', {
+      headers: { Authorization: `Bearer ${process.env.VERCEL_TOKEN}` },
+    }).then((r) => r.json());
+
+    pass(`vercel project ${projectName} ready`, `project=${projectId} team=${teamId}`);
+
+    // `limited` is what refuses deployments containing serverless functions.
+    if (user.user?.limited) {
+      failed = true;
+      console.log(
+        bad('FAIL') +
+          `  vercel account "${user.user.username}" is limited — deployments with functions will be BLOCKED`,
+      );
+    } else {
+      pass(`vercel account ${user.user?.username} in good standing`, 'limited=false');
+    }
   } catch (err) {
     fail('vercel unreachable', err.message);
   }
