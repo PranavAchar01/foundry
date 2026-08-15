@@ -1,4 +1,3 @@
-import { env } from './env';
 import { brain, type BrainMessage, type BrainToolResult, type ToolSpec } from './brain';
 import * as machine from './machine';
 import * as decisions from './decisions';
