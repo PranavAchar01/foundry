@@ -90,6 +90,14 @@ export interface PageSpec {
   /** Absolute URL the pageview beacon posts to. */
   beaconEndpoint: string;
   disclosure: string;
+  /**
+   * The buyer's own description of their work, when the business was spawned
+   * for one named person rather than a whole segment. Unset on the segment
+   * path, where there is no single buyer to write to.
+   */
+  prospectBio?: string;
+  /** The specific repeating chore in that person's week the product removes. */
+  prospectChore?: string;
 }
 
 export interface GeneratedPage {

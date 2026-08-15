@@ -157,7 +157,9 @@ h3 {
 }
 
 /* ---------- the ember pill ----------
-   Priceflag's glass button, recast: pink ember on plum. Use once per view. */
+   Priceflag's glass button, recast: pink ember on plum. Once per screenful —
+   the hero pill and the run pill are the same invitation and sit a screen
+   apart, so they are never both in front of you. */
 .btn-ember {
   --ember: 255, 95, 162;
   position: relative;
@@ -205,6 +207,61 @@ h3 {
 .btn-ember:active {
   transform: translateY(0) scale(0.985);
   transition-duration: 0.09s;
+}
+
+/* The run button is the one thing on this page you are meant to press, so it
+   gets the ember at display size and a ring that breathes while nothing is
+   happening. The ring is a pseudo-element, not a box-shadow keyframe, because
+   animating the shadow would drop the glass edge the pill is made of. */
+.btn-ember-xl {
+  padding: 17px 38px;
+  font-size: 16px;
+}
+@keyframes foundry-halo {
+  0% {
+    transform: scale(0.97);
+    opacity: 0.6;
+  }
+  70%,
+  100% {
+    transform: scale(1.16);
+    opacity: 0;
+  }
+}
+.ember-halo::after {
+  content: '';
+  position: absolute;
+  inset: -5px;
+  z-index: -1;
+  border: 1px solid rgba(255, 95, 162, 0.6);
+  border-radius: 999px;
+  pointer-events: none;
+  animation: foundry-halo 2.6s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
+/* ---------- tiles arriving ----------
+   A tile is placed the moment its person is chosen and stays put while it
+   fills in, so the entrance is staggered once and the ring fires exactly when
+   the build comes back with a URL — never on a timer. */
+.tile-in {
+  animation: foundry-in 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes foundry-ring {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+.tile-land::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  box-shadow: inset 0 0 0 1.5px var(--color-acc);
+  pointer-events: none;
+  animation: foundry-ring 1.5s ease-out 2 forwards;
 }
 
 /* ---------- page-load intro (Priceflag's choreography) ----------
@@ -366,8 +423,15 @@ h3 {
   }
   .shimmer,
   .pulse,
-  .row-in {
+  .row-in,
+  .tile-in,
+  .ember-halo::after,
+  .tile-land::after {
     animation: none;
+  }
+  .ember-halo::after,
+  .tile-land::after {
+    display: none;
   }
   .intro .hero-media,
   .intro .hero-title,

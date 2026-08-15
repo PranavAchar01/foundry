@@ -2,12 +2,17 @@
 
 import Image from 'next/image';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import CompanyDetail from './detail';
-import ClientRun from './client-run';
+import CompanyDetail, { type Prospect } from './detail';
+import ClientRun, { type RunPerson } from './client-run';
 
 /**
  * One page. Every company is a tile showing its actual hero page, live.
  * Click a tile and you get the site, the machine running it, and the numbers.
+ *
+ * A company built for a named person carries their handle on the tile. While a
+ * run is in flight the same grid holds the people it is still building for, so
+ * the eight tiles appear the moment they are chosen and fill in one by one
+ * instead of arriving all at once when the last build finishes.
  */
 
 interface PnL {
@@ -31,6 +36,8 @@ interface Card {
   kill_reason: string | null;
   pnl: PnL;
   cacUsd: number | null;
+  /** The person this was built for; empty when it belongs to nobody in particular. */
+  prospectUsername: string;
 }
 
 interface Decision {
@@ -72,10 +79,16 @@ const STATUS: Record<Card['status'], string> = {
   KILLED: 'border-transparent bg-[var(--color-accdim)] text-[var(--color-muted)]',
 };
 
+interface Opened {
+  id: string;
+  prospect: Prospect | null;
+}
+
 export default function Dashboard() {
   const [data, setData] = useState<Payload | null>(null);
   const [machines, setMachines] = useState<MachineLite[]>([]);
-  const [open, setOpen] = useState<string | null>(null);
+  const [people, setPeople] = useState<RunPerson[]>([]);
+  const [open, setOpen] = useState<Opened | null>(null);
   const [connected, setConnected] = useState(false);
   const [latest, setLatest] = useState<Decision | null>(null);
   const [introGo, setIntroGo] = useState(false);
@@ -92,7 +105,17 @@ export default function Dashboard() {
         fetch('/api/portfolio', { cache: 'no-store' }).then((r) => r.json()),
         fetch('/api/machines', { cache: 'no-store' }).then((r) => r.json()),
       ]);
-      setData(p as Payload);
+      const payload = p as Payload;
+      // A row written before the prospect column was migrated in comes back
+      // without the field at all, and the grid reads it as a handle on every
+      // card it lays out — which took the whole page down rather than one tile.
+      setData({
+        ...payload,
+        businesses: payload.businesses.map((b) => ({
+          ...b,
+          prospectUsername: b.prospectUsername ?? '',
+        })),
+      });
       setMachines(
         ((m.machines ?? []) as { businessId: string; status: string; previewUrl: string }[]).map(
           (x) => ({ businessId: x.businessId, status: x.status, previewUrl: x.previewUrl }),
@@ -135,6 +158,33 @@ export default function Dashboard() {
   const { pnl, budget } = data;
   const live = data.businesses.filter((b) => b.status !== 'KILLED');
 
+  /*
+   * People currently being run for come first and keep their place in the grid
+   * from the moment they are chosen: the same tile carries them from queued to
+   * built to DM'd. Once the portfolio catches up the card takes over inside
+   * that tile, which is why the run person and the card are matched here rather
+   * than rendered as two separate cards that swap.
+   *
+   * Tiles are keyed by handle wherever there is one, so a tile keeps the same
+   * identity when the run state falls away and only the card is left. A key
+   * that changed there would remount the tile and reload the site inside it.
+   */
+  const byHandle = new Map(
+    data.businesses.filter((b) => b.prospectUsername).map((b) => [b.prospectUsername.toLowerCase(), b]),
+  );
+  const inRun = new Set(people.map((p) => p.target.username.toLowerCase()));
+  const key = (handle: string, id: string) => (handle ? `p-${handle.toLowerCase()}` : id);
+  const tiles: { key: string; card?: Card; person?: RunPerson }[] = [
+    ...people.map((person) => ({
+      key: key(person.target.username, ''),
+      card: byHandle.get(person.target.username.toLowerCase()),
+      person,
+    })),
+    ...data.businesses
+      .filter((b) => !inRun.has(b.prospectUsername.toLowerCase()))
+      .map((card) => ({ key: key(card.prospectUsername, card.id), card })),
+  ];
+
   return (
     <main className={`intro${introGo ? ' intro-go' : ''}`}>
       {/* ---- hero: the painting inside a top-rounded card, dusk scrim, ember CTA ---- */}
@@ -173,8 +223,8 @@ export default function Dashboard() {
               <br />
               with no employees.
             </h1>
-            <a className="hero-cta btn-ember mt-9" href="#portfolio">
-              See the portfolio
+            <a className="hero-cta btn-ember mt-9" href="#run">
+              Watch it find a client
             </a>
           </div>
         </div>
@@ -216,67 +266,28 @@ export default function Dashboard() {
         </div>
       )}
 
-      <ClientRun />
+      <ClientRun onPeople={setPeople} onSettled={refresh} />
 
       {/* ---- the wall of companies ---- */}
-      {data.businesses.length === 0 ? (
+      {tiles.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-[var(--color-line)] px-6 py-16 text-center text-sm text-[var(--color-dim)]">
-          No companies yet. The next CEO cycle will spawn one.
+          No companies yet. Press <span className="text-[var(--color-fg)]">Run it</span> and one gets
+          built for every person it finds.
         </p>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {data.businesses.map((b) => {
-            const m = machines.find((x) => x.businessId === b.id);
-            return (
-              <button
-                key={b.id}
-                onClick={() => setOpen(b.id)}
-                className="group card-shadow card-hover overflow-hidden rounded-2xl border border-[var(--color-line)] bg-[var(--color-panel)] text-left"
-              >
-                {/* the company's actual hero page */}
-                <div className="relative h-44 overflow-hidden border-b border-[var(--color-line)] bg-[var(--color-panel2)]">
-                  {b.url ? (
-                    <TilePreview url={b.url} name={b.name} />
-                  ) : (
-                    <div className="flex h-full items-center justify-center font-mono text-[11px] text-[var(--color-dim)]">
-                      no storefront
-                    </div>
-                  )}
-                  {b.status === 'KILLED' && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-[#0b0614]/70 text-[11px] font-medium tracking-[0.18em] text-[var(--color-fg)] backdrop-blur-[2px]">
-                      KILLED
-                    </div>
-                  )}
-                  <span
-                    className={`absolute top-2 right-2 rounded-full border px-2 py-0.5 font-mono text-[9px] tracking-wider ${STATUS[b.status]}`}
-                  >
-                    {b.status}
-                  </span>
-                  {m && (
-                    <span className="absolute bottom-2 left-2 rounded-full border border-[var(--color-line)] bg-[#0b0614]/80 px-2 py-0.5 font-mono text-[9px] text-[var(--color-muted)] backdrop-blur-sm">
-                      {m.status === 'active' ? <span className="pulse text-[var(--color-fg)]">● </span> : '○ '}
-                      VM {m.status}
-                    </span>
-                  )}
-                </div>
-
-                {/* the three numbers that matter */}
-                <div className="px-4 py-3">
-                  <h3 className="truncate text-base font-normal">{b.name}</h3>
-                  <p className="truncate text-[11px] text-[var(--color-dim)]">{b.niche}</p>
-                  <dl className="mt-3 grid grid-cols-3 gap-2 font-mono text-[11px]">
-                    <Cell label="visits" value={String(b.visitors)} />
-                    <Cell label="sales" value={String(b.conversions)} />
-                    <Cell
-                      label="net"
-                      value={`${b.pnl.netCents < 0 ? '−' : ''}${usd(b.pnl.netCents)}`}
-                      tone={b.pnl.netCents >= 0 ? 'acc' : 'muted'}
-                    />
-                  </dl>
-                </div>
-              </button>
-            );
-          })}
+          {tiles.map((t, i) => (
+            <Tile
+              key={t.key}
+              card={t.card}
+              person={t.person}
+              machine={machines.find(
+                (x) => x.businessId === (t.card?.id ?? t.person?.businessId),
+              )}
+              index={i}
+              onOpen={setOpen}
+            />
+          ))}
         </div>
       )}
 
@@ -355,8 +366,171 @@ export default function Dashboard() {
         </div>
       </footer>
 
-      {open && <CompanyDetail id={open} onClose={() => setOpen(null)} />}
+      {open && (
+        <CompanyDetail id={open.id} prospect={open.prospect} onClose={() => setOpen(null)} />
+      )}
     </main>
+  );
+}
+
+/**
+ * One company on the wall.
+ *
+ * The same component draws a finished company and one that is still being
+ * built, because they are the same tile at different moments — swapping
+ * components mid-run would remount the iframe and reload the site under it.
+ */
+function Tile({
+  card,
+  person,
+  machine,
+  index,
+  onOpen,
+}: {
+  card?: Card;
+  person?: RunPerson;
+  machine?: MachineLite;
+  index: number;
+  onOpen: (o: Opened) => void;
+}) {
+  const handle = person?.target.username ?? card?.prospectUsername ?? '';
+  const url = card?.url || person?.url || '';
+  const name = card?.name ?? person?.target.niche.name ?? '';
+  const sub = card?.niche || person?.target.niche.tagline || '';
+  const id = card?.id ?? person?.businessId ?? null;
+  const build = person?.build ?? 'live';
+
+  return (
+    <button
+      onClick={() =>
+        id &&
+        onOpen({
+          id,
+          prospect: handle
+            ? {
+                username: handle,
+                evidence: person?.target.evidence ?? null,
+                dm: person?.dm === 'sent' ? person.message : null,
+              }
+            : null,
+        })
+      }
+      disabled={!id}
+      style={{ animationDelay: `${Math.min(index, 11) * 45}ms` }}
+      className={`group card-shadow relative overflow-hidden rounded-2xl border border-[var(--color-line)] bg-[var(--color-panel)] text-left tile-in ${
+        id ? 'card-hover' : 'cursor-default'
+      } ${build === 'live' && person ? 'tile-land' : ''}`}
+    >
+      {/* the company's actual hero page — or an honest account of why it isn't there yet */}
+      <div className="relative h-44 overflow-hidden border-b border-[var(--color-line)] bg-[var(--color-panel2)]">
+        {url ? (
+          <TilePreview url={url} name={name} />
+        ) : build === 'building' ? (
+          <>
+            <div className="shimmer absolute inset-0" />
+            <div className="absolute inset-0 flex items-center justify-center gap-2 font-mono text-[11px] text-[var(--color-muted)]">
+              <span className="pulse inline-block h-1.5 w-1.5 rounded-full bg-[var(--color-acc)]" />
+              building the site
+            </div>
+          </>
+        ) : (
+          <div className="flex h-full items-center justify-center px-6 text-center font-mono text-[11px] text-[var(--color-dim)]">
+            {build === 'queued'
+              ? 'queued — waiting for a builder'
+              : build === 'failed'
+                ? (person?.buildError ?? 'build failed')
+                : 'no storefront'}
+          </div>
+        )}
+
+        {card?.status === 'KILLED' && (
+          <div className="absolute inset-0 flex items-center justify-center bg-[#0b0614]/70 text-[11px] font-medium tracking-[0.18em] text-[var(--color-fg)] backdrop-blur-[2px]">
+            KILLED
+          </div>
+        )}
+
+        {card ? (
+          <span
+            className={`absolute top-2 right-2 rounded-full border px-2 py-0.5 font-mono text-[9px] tracking-wider ${STATUS[card.status]}`}
+          >
+            {card.status}
+          </span>
+        ) : (
+          <span className="absolute top-2 right-2 rounded-full border border-[var(--color-line)] bg-[#0b0614]/80 px-2 py-0.5 font-mono text-[9px] tracking-wider text-[var(--color-muted)] backdrop-blur-sm">
+            {build.toUpperCase()}
+          </span>
+        )}
+
+        {machine && (
+          <span className="absolute bottom-2 left-2 rounded-full border border-[var(--color-line)] bg-[#0b0614]/80 px-2 py-0.5 font-mono text-[9px] text-[var(--color-muted)] backdrop-blur-sm">
+            {machine.status === 'active' ? <span className="pulse text-[var(--color-fg)]">● </span> : '○ '}
+            VM {machine.status}
+          </span>
+        )}
+      </div>
+
+      <div className="px-4 py-3">
+        {handle && (
+          <p className="mb-1 flex items-center gap-1.5 font-mono text-[11px] text-[var(--color-acc)]">
+            <span className="truncate">@{handle}</span>
+            {person && person.build === 'live' && person.buildMs > 0 && (
+              <span className="ml-auto shrink-0 text-[10px] text-[var(--color-dim)]">
+                built in {(person.buildMs / 1000).toFixed(1)}s
+              </span>
+            )}
+          </p>
+        )}
+        <h3 className="truncate text-base font-normal">{name}</h3>
+        <p className="truncate text-[11px] text-[var(--color-dim)]">{sub}</p>
+
+        {card ? (
+          <dl className="mt-3 grid grid-cols-3 gap-2 font-mono text-[11px]">
+            <Cell label="visits" value={String(card.visitors)} />
+            <Cell label="sales" value={String(card.conversions)} />
+            <Cell
+              label="net"
+              value={`${card.pnl.netCents < 0 ? '−' : ''}${usd(card.pnl.netCents)}`}
+              tone={card.pnl.netCents >= 0 ? 'acc' : 'muted'}
+            />
+          </dl>
+        ) : (
+          person && (
+            <p className="mt-3 font-mono text-[11px] text-[var(--color-muted)]">
+              ${(person.target.niche.priceCents / 100).toFixed(2)}/month ·{' '}
+              <span className="text-[var(--color-dim)]">{person.target.niche.targetCustomer}</span>
+            </p>
+          )
+        )}
+      </div>
+
+      {/* the DM, on the tile of the person it goes to */}
+      {person && person.dm !== 'waiting' && (
+        <div className="border-t border-[var(--color-line)] bg-[var(--color-bg)] px-4 py-2.5">
+          <p className="font-mono text-[10px] tracking-wider uppercase">
+            {person.dm === 'sending' && (
+              <span className="text-[var(--color-muted)]">
+                <span className="pulse mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-[var(--color-acc)] align-middle" />
+                sending the DM
+              </span>
+            )}
+            {person.dm === 'sent' && (
+              <span className="text-[var(--color-acc)]">
+                {person.followed ? 'followed · DM sent' : 'DM sent'}
+              </span>
+            )}
+            {person.dm === 'failed' && (
+              <span className="text-[var(--color-dim)]">DM not sent — {person.dmError}</span>
+            )}
+            {person.dm === 'skipped' && <span className="text-[var(--color-dim)]">no DM — nothing to send</span>}
+          </p>
+          {person.message && (
+            <p className="mt-1 line-clamp-2 text-[11.5px] leading-relaxed text-[var(--color-muted)]">
+              {person.message}
+            </p>
+          )}
+        </div>
+      )}
+    </button>
   );
 }
 

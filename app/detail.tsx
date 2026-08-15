@@ -5,10 +5,23 @@ import { useEffect, useRef, useState } from 'react';
 /**
  * One company, everything at once.
  *
- * No tabs: the storefront, the machine running it, the traction and the agent's
- * reasoning are all on screen together, because the whole point is seeing that
- * they belong to the same thing.
+ * No tabs: the person it was built for, the storefront, the machine running it,
+ * the traction and the agent's reasoning are all on screen together, because
+ * the whole point is seeing that they belong to the same thing.
  */
+
+/**
+ * Who the company was built for.
+ *
+ * The handle rides in from the tile rather than the company endpoint: the grid
+ * already knows it, and during a run it also knows the message that went out,
+ * which is never stored on the business.
+ */
+export interface Prospect {
+  username: string;
+  evidence: string | null;
+  dm: string | null;
+}
 
 interface Detail {
   business: {
@@ -108,7 +121,15 @@ function SiteFrame({ url, title }: { url: string; title: string }) {
   );
 }
 
-export default function CompanyDetail({ id, onClose }: { id: string; onClose: () => void }) {
+export default function CompanyDetail({
+  id,
+  prospect,
+  onClose,
+}: {
+  id: string;
+  prospect: Prospect | null;
+  onClose: () => void;
+}) {
   const [data, setData] = useState<Detail | null>(null);
   const [console_, setConsole] = useState<string>('');
   const [consoleAt, setConsoleAt] = useState<string>('');
@@ -185,6 +206,11 @@ export default function CompanyDetail({ id, onClose }: { id: string; onClose: ()
         {/* header */}
         <header className="flex items-start justify-between gap-4 border-b border-[var(--color-line)] px-6 py-4">
           <div className="min-w-0">
+            {prospect && (
+              <p className="font-mono text-[11px] text-[var(--color-acc)]">
+                built for @{prospect.username}
+              </p>
+            )}
             <h2 className="truncate text-2xl font-normal">{b?.name ?? 'loading…'}</h2>
             <p className="truncate text-sm text-[var(--color-muted)]">{b?.tagline || b?.niche}</p>
           </div>
@@ -207,6 +233,35 @@ export default function CompanyDetail({ id, onClose }: { id: string; onClose: ()
             </button>
           </div>
         </header>
+
+        {/* the person, before the numbers: this company exists for exactly one of them */}
+        {prospect && (
+          <div className="border-b border-[var(--color-line)] bg-[var(--color-panel)] px-6 py-4">
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <a
+                href={`https://x.com/${prospect.username}`}
+                target="_blank"
+                rel="noreferrer"
+                className="font-mono text-[15px] text-[var(--color-fg)] underline underline-offset-2 hover:text-[var(--color-acc)]"
+              >
+                @{prospect.username}
+              </a>
+              {prospect.evidence && (
+                <span className="text-[13px] text-[var(--color-muted)]">{prospect.evidence}</span>
+              )}
+            </div>
+            {prospect.dm && (
+              <div className="mt-3">
+                <p className="font-mono text-[9.5px] tracking-wider text-[var(--color-dim)] uppercase">
+                  the DM they were sent
+                </p>
+                <p className="mt-1 border-l-2 border-[var(--color-acc)] pl-3 text-[13px] leading-relaxed whitespace-pre-line text-[var(--color-muted)]">
+                  {prospect.dm}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* traction, plainly, across the top */}
         <div className="grid grid-cols-3 gap-px border-b border-[var(--color-line)] bg-[var(--color-line)] md:grid-cols-6">
