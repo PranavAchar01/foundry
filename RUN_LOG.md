@@ -491,3 +491,74 @@ that verifies the disclosure line on public artefacts — and it passed.
 Gate: lint clean, typecheck clean, build clean, **41 passed / 8 skipped**.
 Deployed; `pnpm smoke` **21/21** against the live URL, now reporting
 `brain=openai … sandbox=superserve bus=band qa=replay`.
+
+## 2026-08-15 — Iteration 17 · the machine room: every company visible on its own VM
+
+Owner asked for each company to be *operated inside* a VM, using the sponsor
+keys, and to be able to **watch** each VM boot, run, and produce output.
+
+### Making a VM visible from the outside
+
+Superserve's base image has no node and no python — only `perl` and `curl`. So
+each machine is seeded with `serve.pl`, a dependency-free static server written
+against perl's core `IO::Socket::INET`. On boot the machine runs it on :8000,
+`publishPreviewPort(8000, {access:'public'})` exposes it, and the URL is stored
+**only if it actually answers** — a preview URL that 502s is worse than none.
+
+Result: every company now has a live page served *by its own machine*, at
+`https://8000-<sandbox-id>.sandbox.superserve.ai`. It starts as the company
+brief and changes as the operator agent rewrites it.
+
+`tests/boot.test.ts` proves it end to end: provision, fetch the preview (200,
+contains the company name and the disclosure line), rewrite `index.html` from
+inside the machine, fetch again and see the change.
+
+### The machine room
+
+`/api/machines` (snapshot) and `/api/machines/stream` (SSE over the append-only
+`machine_runs` table) feed a new dashboard section: one panel per VM with its
+status, uptime, billed cost, boot log, a link to its live view, and a **live
+shell** showing each command and its stdout as the operator runs it.
+
+### Three real defects found by running it, not by reading it
+
+1. **Machines only existed for businesses spawned after the machine layer.**
+   The CEO cycle now provisions machines for any live business lacking one,
+   capped at 3 per cycle so a backlog cannot blow the function timeout.
+2. **Two previews served 502.** A spawned process does not reliably survive
+   pause/resume. Added `ensureServing()` — it curls :8000 from inside the
+   machine and restarts `serve.pl` if it has gone away, called on every connect
+   and every metering pass. 8/8 previews now serve 200.
+3. **A duplicate-key race** against the 5-minute cron: two cycles provisioned
+   the same business concurrently. The partial unique index is the arbiter, so
+   the insert is now `ON CONFLICT DO NOTHING` and the loser **kills the machine
+   it just built** rather than leaking a paid-for VM.
+
+### Band was silently failing
+
+`bus.publish` is wrapped in `.catch(() => {})`, so Band had been recording
+nothing since it was switched on — 0 rooms. Three wire-format errors, each
+found against the live API:
+
+- chat rooms take `title`, not `name`;
+- `/messages` **requires at least one @mention** — a CEO cycle notification
+  addresses nobody, so it is a `/events` post with `message_type: 'thought'`
+  (not `event_type`), carrying the payload as structured `metadata`;
+- events are **not** readable back through `/messages`; `/context` is the
+  combined record and preserves `metadata`.
+
+`tests/bus.test.ts` now asserts a real publish→read round-trip with the payload
+intact. Live cycles are recording into `foundry:ceo.cycle.started` and
+`foundry:ceo.cycle.finished`.
+
+### Sponsor coverage, verified live
+
+- **Superserve** — create, connect, `files.write`, `commands.run`/`spawn`,
+  `publishPreviewPort`, `getPreviewUrl`, pause/resume/kill, metadata. 8 live
+  machines, 8/8 previews serving, 28 recorded commands.
+- **Band** — agent identity, chat rooms, events, context read-back. Live.
+- **Replay QA** — project created per spawned storefront; exploration runs in
+  the background while the synchronous content gate still guards the spawn.
+
+Gate: lint clean, typecheck clean, build clean, **41 passed / 10 skipped**.
+Deployed and confirmed in the browser.

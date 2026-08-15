@@ -291,6 +291,48 @@ export async function runCycle(opts: CycleOptions = {}): Promise<CycleResult> {
     }
   }
 
+  // --- 3a. every live business should have a machine ------------------------
+  // Businesses spawned before the machine layer existed, or whose provisioning
+  // was declined by a budget ceiling, get one here. Bounded per cycle so a
+  // backlog cannot push the cycle past the function timeout.
+  if (env.superserveApiKey) {
+    const have = new Set((await machine.list()).map((m) => m.business_id));
+    const missing = (await businesses.live()).filter((b) => !have.has(b.id)).slice(0, 3);
+
+    for (const b of missing) {
+      try {
+        const provisioned = await machine.provision({
+          businessId: b.id,
+          name: b.name,
+          niche: b.niche,
+          offer: b.tagline,
+          targetCustomer: b.niche,
+          priceCents: b.price_cents,
+          url: b.url,
+          thesis: b.tagline,
+          cycleId,
+        });
+        steps.push({
+          businessId: b.id,
+          action: provisioned.ok ? 'MACHINE_PROVISIONED' : 'MACHINE_DECLINED',
+          reasoning: provisioned.ok
+            ? `Booted a machine for ${b.name}` +
+              (provisioned.machine?.preview_url ? `, live at ${provisioned.machine.preview_url}` : '')
+            : provisioned.reason,
+          decisionId: '',
+          model: 'guardrail',
+          spentUsd: 0,
+        });
+      } catch (err) {
+        steps.push({
+          businessId: b.id, action: 'MACHINE_FAILED',
+          reasoning: `Could not boot a machine for ${b.name}: ${String(err).slice(0, 200)}`,
+          decisionId: '', model: 'guardrail', spentUsd: 0,
+        });
+      }
+    }
+  }
+
   // --- 3b. one operator session, on the least-recently-worked business ------
   // One per cycle keeps the cycle inside Vercel's 300s function ceiling; over
   // successive cycles every business gets worked in turn.
@@ -331,7 +373,7 @@ export async function runCycle(opts: CycleOptions = {}): Promise<CycleResult> {
     }
 
     // Bill elapsed machine time and pause anything idle.
-    await machine.meterAndPark().catch(() => ({ billed: 0, paused: 0 }));
+    await machine.meterAndPark().catch(() => ({ billed: 0, paused: 0, healed: 0 }));
   }
 
   // --- 4. latch the breaker if this cycle exhausted the budget --------------

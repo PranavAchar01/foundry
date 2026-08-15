@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import MachineRoom from './machines';
 
 // ---------------------------------------------------------------------------
 // Types mirroring /api/portfolio
@@ -308,6 +309,9 @@ export default function Dashboard({ initial }: { initial: Payload | null }) {
           </div>
         )}
       </section>
+
+      {/* ---- machine room ---- */}
+      <MachineRoom />
 
       {/* ---- allocation log ---- */}
       <section className="mb-10">

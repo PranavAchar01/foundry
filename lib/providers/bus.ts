@@ -87,55 +87,75 @@ export class BandBusProvider implements BusProvider {
     return (res.status === 204 ? undefined : await res.json()) as T;
   }
 
-  /** Finds the chat room for a topic, creating it on first use. */
+  /** Finds the chat room for a topic, creating it on first use. Keyed by title. */
   private async room(topic: string): Promise<string> {
     const cached = this.rooms.get(topic);
     if (cached) return cached;
 
-    const name = `foundry:${topic}`;
-    const list = await this.call<{ data?: { id: string; name: string }[] }>('GET', '/agent/chats');
-    const found = (list.data ?? []).find((c) => c.name === name);
+    const title = `foundry:${topic}`;
+    const list = await this.call<{ data?: { id: string; title?: string }[] }>('GET', '/agent/chats');
+    const found = (list.data ?? []).find((c) => c.title === title);
     if (found) {
       this.rooms.set(topic, found.id);
       return found.id;
     }
 
-    const made = await this.call<{ data?: { id: string } }>('POST', '/agent/chats', { chat: { name } });
+    const made = await this.call<{ data?: { id: string } }>('POST', '/agent/chats', {
+      chat: { title },
+    });
     const id = made.data?.id;
     if (!id) throw new Error(`band could not create a chat room for ${topic}`);
     this.rooms.set(topic, id);
     return id;
   }
 
+  /**
+   * Published as an **event**, not a message.
+   *
+   * Band splits the two deliberately: `/messages` are directed at participants
+   * and require at least one @mention, while `/events` are informational
+   * records of what happened. A CEO cycle notification is the latter — there is
+   * no agent being addressed — so posting it as a message is rejected with 422.
+   */
   async publish(topic: string, payload: Record<string, unknown>): Promise<{ id: string }> {
     const chatId = await this.room(topic);
     const out = await this.call<{ data?: { id: string } }>(
       'POST',
-      `/agent/chats/${chatId}/messages`,
-      { message: { content: JSON.stringify(payload) } },
+      `/agent/chats/${chatId}/events`,
+      {
+        event: {
+          message_type: 'thought',
+          content: `${topic} ${JSON.stringify(payload)}`.slice(0, 900),
+          metadata: payload,
+        },
+      },
     );
     return { id: out.data?.id ?? '' };
   }
 
+  /**
+   * Read back through `/context`, not `/messages`.
+   *
+   * Events published above never appear in the room's message list — that
+   * endpoint only carries mention-directed messages. `/context` is the combined
+   * record, and it preserves the structured `metadata` the payload was sent as.
+   */
   async consume(topic: string, limit = 10): Promise<BusMessage[]> {
     const chatId = await this.room(topic);
-    const out = await this.call<{ data?: { id: string; content: string }[] }>(
+    const out = await this.call<{ data?: { id: string; content?: string; metadata?: Record<string, unknown> }[] }>(
       'GET',
-      `/agent/chats/${chatId}/messages?limit=${limit}`,
+      `/agent/chats/${chatId}/context`,
     );
-    return (out.data ?? []).map((m) => {
-      let parsed: Record<string, unknown>;
-      try {
-        parsed = JSON.parse(m.content) as Record<string, unknown>;
-      } catch {
-        parsed = { content: m.content };
-      }
-      return { id: m.id, topic, payload: parsed };
-    });
+    return (out.data ?? []).slice(0, limit).map((m) => ({
+      id: m.id,
+      topic,
+      payload: m.metadata ?? { content: m.content ?? '' },
+    }));
   }
 
   async ack(messageId: string): Promise<void> {
-    // Band tracks per-message processing state on the agent's inbox.
+    // Band tracks per-message processing state on the agent's inbox. Events are
+    // informational and have nothing to acknowledge, so a 404 here is expected.
     await this.call<void>('POST', `/agent/messages/${messageId}/processed`).catch(() => {});
   }
 }

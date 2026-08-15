@@ -74,6 +74,8 @@ export async function list(): Promise<MachineRow[]> {
 
 export interface ProvisionSpec {
   businessId: string;
+  /** Carried onto the machine's own page. */
+  disclosureLine?: string;
   name: string;
   niche: string;
   offer: string;
@@ -149,18 +151,60 @@ export async function provision(spec: ProvisionSpec): Promise<ProvisionResult> {
       ),
     ],
     ['/root/company/NOTES.md', '# Working notes\n\nAppend findings here.\n'],
+    ['/root/company/serve.pl', SERVE_PL],
+    ['/root/company/index.html', bootPage(spec)],
   ];
   for (const [path, content] of seed) {
     await box.files.write(path, content);
   }
 
+  // Boot the machine's own web view and expose it. Every command here is
+  // recorded, so the boot sequence is watchable rather than implied.
   const machineId = id('mch');
+  let previewUrl = '';
+  const bootLog: string[] = [];
+  try {
+    await box.commands.run('chmod +x /root/company/serve.pl');
+    await box.commands.spawn('perl /root/company/serve.pl /root/company 8000');
+    await new Promise((r) => setTimeout(r, 1200));
+    await box.publishPreviewPort(8000, { access: 'public' });
+    previewUrl = box.getPreviewUrl(8000);
+
+    // Only claim a preview URL that actually answers.
+    const probe = await fetch(previewUrl, { signal: AbortSignal.timeout(8000) }).catch(() => null);
+    bootLog.push(`serve.pl on :8000 -> ${probe?.status ?? 'no response'}`);
+    if (!probe?.ok) previewUrl = '';
+  } catch (err) {
+    bootLog.push(`preview unavailable: ${String(err).slice(0, 160)}`);
+  }
+
+  // A concurrent cycle may have provisioned this business between the check at
+  // the top and here — the partial unique index is the real arbiter. Losing
+  // that race must not kill the machine we just built, so surrender it.
   const rows = await query<MachineRow>(
-    `INSERT INTO machines (id, business_id, provider, external_id, status, last_started_at, meta)
-     VALUES ($1,$2,'superserve',$3,'active', now(), $4)
+    `INSERT INTO machines (id, business_id, provider, external_id, status, preview_url, last_started_at, meta)
+     VALUES ($1,$2,'superserve',$3,'active',$4, now(), $5)
+     ON CONFLICT DO NOTHING
      RETURNING *`,
-    [machineId, spec.businessId, box.id, JSON.stringify({ name: spec.name, seeded: true })],
+    [
+      machineId,
+      spec.businessId,
+      box.id,
+      previewUrl,
+      JSON.stringify({ name: spec.name, seeded: true, bootLog }),
+    ],
   );
+
+  if (!rows.length) {
+    await box.kill().catch(() => {});
+    const winner = await forBusiness(spec.businessId);
+    return {
+      ok: Boolean(winner),
+      machine: winner,
+      reason: 'another cycle provisioned this business first; released the duplicate machine',
+      guardrailCode: '',
+    };
+  }
 
   await decisions.record({
     cycleId: spec.cycleId ?? `machine_${Date.now().toString(36)}`,
@@ -169,14 +213,89 @@ export async function provision(spec: ProvisionSpec): Promise<ProvisionResult> {
     reasoning:
       `Gave ${spec.name} its own machine (${box.id}). It is seeded with the company brief, ` +
       'so the operator agent can keep working state between cycles instead of starting cold ' +
-      `each time. Metered at $${env.machineCostPerHour}/hour and paused when idle.`,
+      `each time. Metered at $${env.machineCostPerHour}/hour and paused when idle.` +
+      (previewUrl ? ` Its working directory is live at ${previewUrl}.` : ''),
     confidence: 1,
     model: 'guardrail',
-    outputs: { machineId, externalId: box.id, provider: 'superserve' },
+    outputs: { machineId, externalId: box.id, provider: 'superserve', previewUrl, bootLog },
   });
 
   return { ok: true, machine: rows[0], reason: 'provisioned', guardrailCode: '' };
 }
+
+/**
+ * A dependency-free static server for the machine's own working directory.
+ *
+ * The base image has no node and no python — only perl and curl — so this is
+ * written against perl's core IO::Socket::INET. It is what makes each VM
+ * visible: publish port 8000 and the company's working directory becomes a
+ * live web page that changes as its operator agent works.
+ */
+const SERVE_PL = String.raw`#!/usr/bin/perl
+use strict; use warnings;
+use IO::Socket::INET;
+$| = 1;
+my $root = $ARGV[0] || '/root/company';
+my $port = $ARGV[1] || 8000;
+my %TYPES = (html=>'text/html', txt=>'text/plain', md=>'text/plain', json=>'application/json',
+             css=>'text/css', js=>'text/javascript', svg=>'image/svg+xml');
+my $sock = IO::Socket::INET->new(LocalAddr=>'0.0.0.0', LocalPort=>$port, Listen=>16,
+                                 ReuseAddr=>1, Proto=>'tcp') or die "bind: $!";
+sub send_res {
+  my ($c, $code, $type, $body) = @_;
+  my $len = length($body);
+  print $c "HTTP/1.1 $code\r\nContent-Type: $type\r\nContent-Length: $len\r\n"
+         . "Access-Control-Allow-Origin: *\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n$body";
+}
+sub listing {
+  my ($dir, $rel) = @_;
+  opendir(my $dh, $dir) or return "<p>cannot read</p>";
+  my @e = sort grep { $_ ne '.' && $_ ne '..' } readdir($dh);
+  closedir $dh;
+  my $out = '';
+  for my $f (@e) {
+    my $path = "$rel$f";
+    my $isdir = -d "$dir/$f";
+    my $size = $isdir ? '' : (-s "$dir/$f") . ' B';
+    $out .= "<li><a href=\"$path" . ($isdir ? '/' : '') . "\">$f" . ($isdir ? '/' : '') . "</a> <span>$size</span></li>";
+  }
+  return $out;
+}
+while (my $c = $sock->accept) {
+  my $req = <$c>;
+  next unless defined $req;
+  my ($path) = $req =~ m{^\w+\s+(\S+)};
+  while (defined(my $h = <$c>)) { last if $h =~ /^\r?$/; }
+  $path = '/' unless defined $path;
+  $path =~ s/\?.*//;
+  $path =~ s/%2e/./gi;
+  $path =~ s{\.\./}{}g;                       # no traversal above the root
+  my $target = $path eq '/' ? $root : "$root$path";
+  if (-d $target) {
+    if (-f "$target/index.html") {
+      open(my $fh, '<', "$target/index.html"); local $/; my $b = <$fh>; close $fh;
+      send_res($c, '200 OK', 'text/html', $b);
+    } else {
+      my $rel = $path eq '/' ? '/' : "$path/"; $rel =~ s{//$}{/};
+      my $items = listing($target, $rel);
+      send_res($c, '200 OK', 'text/html',
+        "<!doctype html><meta charset=utf-8><title>machine</title>"
+        . "<style>body{background:#08090b;color:#e8eaed;font:14px ui-monospace,Menlo,monospace;padding:32px}"
+        . "a{color:#4ade80;text-decoration:none}a:hover{text-decoration:underline}"
+        . "li{margin:4px 0;list-style:none}span{color:#5c636d;margin-left:8px}h1{font-size:15px;color:#8b929c}</style>"
+        . "<h1>$path</h1><ul>$items</ul>");
+    }
+  } elsif (-f $target) {
+    my ($ext) = $target =~ /\.(\w+)$/;
+    my $type = ($ext && $TYPES{lc $ext}) ? $TYPES{lc $ext} : 'text/plain';
+    open(my $fh, '<', $target); local $/; my $b = <$fh>; close $fh;
+    send_res($c, '200 OK', $type, $b);
+  } else {
+    send_res($c, '404 Not Found', 'text/plain', "not found: $path");
+  }
+  close $c;
+}
+`;
 
 function companyBrief(spec: ProvisionSpec): string {
   return `# ${spec.name}
@@ -201,9 +320,69 @@ write here persists between cycles.
 `;
 }
 
+/** The page a machine serves before its operator has written anything. */
+function bootPage(spec: ProvisionSpec): string {
+  const esc = (s: string) =>
+    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return `<!doctype html><meta charset="utf-8"><title>${esc(spec.name)} — machine</title>
+<style>
+ body{background:#08090b;color:#e8eaed;font:14px/1.6 ui-monospace,Menlo,monospace;padding:40px;max-width:760px;margin:0 auto}
+ h1{font-size:19px;margin:0 0 4px} .m{color:#5c636d} .a{color:#4ade80}
+ ul{padding-left:18px;margin:14px 0} li{margin:3px 0}
+ .box{border:1px solid #1e2228;border-radius:10px;padding:18px;margin-top:22px;background:#0e1014}
+</style>
+<h1>${esc(spec.name)}</h1>
+<div class="m">${esc(spec.niche)} · machine online</div>
+<div class="box">
+  <div class="a">operator workspace</div>
+  <ul>
+    <li><a class="a" href="/COMPANY.md">COMPANY.md</a> — the brief</li>
+    <li><a class="a" href="/NOTES.md">NOTES.md</a> — durable findings</li>
+    <li><a class="a" href="/company.json">company.json</a></li>
+  </ul>
+  <div class="m">This page is served by the machine itself. The operator agent may
+  replace it as it works — what you see here is whatever it has built so far.</div>
+</div>
+<p class="m">${esc(spec.disclosureLine ?? env.disclosureLine)}</p>
+`;
+}
+
 // ---------------------------------------------------------------------------
 // Running work on the machine
 // ---------------------------------------------------------------------------
+
+/**
+ * The machine's own web view is a long-running process, and a process does not
+ * reliably survive a pause/resume cycle. This checks the port from inside the
+ * machine and restarts the server if it has gone away, so a paused-then-woken
+ * machine does not silently start serving 502s.
+ */
+export async function ensureServing(
+  box: { commands: { run: (c: string, o?: { timeoutMs?: number }) => Promise<{ stdout?: string }>; spawn: (c: string) => Promise<unknown> } },
+  machineRow: MachineRow,
+): Promise<boolean> {
+  const probe = await box.commands
+    .run(`curl -s -o /dev/null -w '%{http_code}' --max-time 3 http://127.0.0.1:8000/ || true`)
+    .catch(() => ({ stdout: '' }));
+
+  if ((probe.stdout ?? '').trim() === '200') return true;
+
+  await box.commands.spawn('perl /root/company/serve.pl /root/company 8000').catch(() => {});
+  await new Promise((r) => setTimeout(r, 1200));
+
+  const again = await box.commands
+    .run(`curl -s -o /dev/null -w '%{http_code}' --max-time 3 http://127.0.0.1:8000/ || true`)
+    .catch(() => ({ stdout: '' }));
+  const healthy = (again.stdout ?? '').trim() === '200';
+
+  if (healthy && !machineRow.preview_url) {
+    // The port was published at boot; only the URL was withheld because nothing
+    // answered. Now that it does, record it.
+    const url = `https://8000-${machineRow.external_id}.sandbox.superserve.ai`;
+    await query(`UPDATE machines SET preview_url = $2 WHERE id = $1`, [machineRow.id, url]);
+  }
+  return healthy;
+}
 
 /** Connects, resuming a paused machine first. Updates the billing clock. */
 async function connect(machine: MachineRow) {
@@ -217,6 +396,9 @@ async function connect(machine: MachineRow) {
       [machine.id],
     );
   }
+
+  // Keep the machine's public view alive across pause/resume.
+  await ensureServing(box, machine).catch(() => false);
   return box;
 }
 
@@ -263,10 +445,11 @@ function truncate(s: string, max = 8000): string {
  * Bills elapsed active time as OPEX and pauses machines that have gone idle.
  * Called once per CEO cycle, so an unused machine costs at most one idle window.
  */
-export async function meterAndPark(): Promise<{ billed: number; paused: number }> {
+export async function meterAndPark(): Promise<{ billed: number; paused: number; healed: number }> {
   const machines = await query<MachineRow>(`SELECT * FROM machines WHERE status = 'active'`);
   let billed = 0;
   let paused = 0;
+  let healed = 0;
 
   for (const machine of machines) {
     const startedAt = machine.last_started_at ? new Date(machine.last_started_at).getTime() : null;
@@ -304,10 +487,20 @@ export async function meterAndPark(): Promise<{ billed: number; paused: number }
       } catch {
         /* a machine that cannot be paused is retried next cycle */
       }
+      continue;
+    }
+
+    // Still active: make sure its public view is actually answering. A machine
+    // showing 502 in the machine room is indistinguishable from a dead one.
+    try {
+      const box = await (await sdk()).connect(machine.external_id, { apiKey: requireKey() });
+      if (await ensureServing(box, machine)) healed++;
+    } catch {
+      /* retried next cycle */
     }
   }
 
-  return { billed, paused };
+  return { billed, paused, healed };
 }
 
 /** Kills a business's machine. Called when the business itself is killed. */
