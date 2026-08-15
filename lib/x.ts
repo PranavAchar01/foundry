@@ -47,6 +47,47 @@ export interface XAccount {
   expires_at: string | null;
 }
 
+/**
+ * Whose account a call acts as.
+ *
+ * `'server'` is the deployment's own account: the cron loops, which have no
+ * browser behind them. Everything driven by a visitor carries their session id
+ * instead.
+ *
+ * This is an explicit parameter rather than implicit request-scoped state on
+ * purpose. An implicit default is precisely how a visitor's request ends up
+ * spending the owner's rate limit and messaging from the owner's handle, and
+ * the failure is silent: it looks like it worked.
+ */
+export type XActor = 'server' | { sessionId: string };
+
+interface AppCredentials {
+  clientId: string;
+  clientSecret: string;
+}
+
+/**
+ * The X app a given actor authorizes against.
+ *
+ * A visitor brings their own, so the tokens they mint belong to their app and
+ * count against their quota rather than the deployment's.
+ */
+async function credentialsFor(actor: XActor): Promise<AppCredentials> {
+  if (actor === 'server') {
+    if (!env.xClientId) throw new Error('X_CLIENT_ID is not set');
+    return { clientId: env.xClientId, clientSecret: env.xClientSecret };
+  }
+
+  const row = await one<{ client_id: string; client_secret: string }>(
+    `SELECT client_id, client_secret FROM x_sessions WHERE id = $1`,
+    [actor.sessionId],
+  );
+  if (!row?.client_id || !row.client_secret) {
+    throw new Error('this session has not supplied its own X app credentials');
+  }
+  return { clientId: row.client_id, clientSecret: row.client_secret };
+}
+
 // ---------------------------------------------------------------------------
 // OAuth 2.0 Authorization Code with PKCE
 // ---------------------------------------------------------------------------
@@ -55,22 +96,24 @@ function base64url(buf: Buffer): string {
   return buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-export async function beginAuthorization(): Promise<{ url: string; state: string }> {
-  if (!env.xClientId) throw new Error('X_CLIENT_ID is not set');
+export async function beginAuthorization(
+  actor: XActor = 'server',
+): Promise<{ url: string; state: string }> {
+  const { clientId } = await credentialsFor(actor);
 
   const state = base64url(randomBytes(24));
   const codeVerifier = base64url(randomBytes(48));
   const codeChallenge = base64url(createHash('sha256').update(codeVerifier).digest());
 
   await query(
-    `INSERT INTO x_oauth_states (state, code_verifier) VALUES ($1, $2)
+    `INSERT INTO x_oauth_states (state, code_verifier, session_id) VALUES ($1, $2, $3)
      ON CONFLICT (state) DO UPDATE SET code_verifier = EXCLUDED.code_verifier`,
-    [state, codeVerifier],
+    [state, codeVerifier, actor === 'server' ? null : actor.sessionId],
   );
 
   const url = new URL(AUTHORIZE);
   url.searchParams.set('response_type', 'code');
-  url.searchParams.set('client_id', env.xClientId);
+  url.searchParams.set('client_id', clientId);
   url.searchParams.set('redirect_uri', env.xCallbackUrl);
   url.searchParams.set('scope', SCOPES.join(' '));
   url.searchParams.set('state', state);
@@ -80,21 +123,27 @@ export async function beginAuthorization(): Promise<{ url: string; state: string
   return { url: url.toString(), state };
 }
 
-function basicAuth(): string {
-  return Buffer.from(`${env.xClientId}:${env.xClientSecret}`).toString('base64');
+function basicAuth(creds: AppCredentials): string {
+  return Buffer.from(`${creds.clientId}:${creds.clientSecret}`).toString('base64');
 }
 
 export async function completeAuthorization(code: string, state: string): Promise<XAccount> {
-  const row = await one<{ code_verifier: string }>(
-    `SELECT code_verifier FROM x_oauth_states WHERE state = $1`,
+  const row = await one<{ code_verifier: string; session_id: string | null }>(
+    `SELECT code_verifier, session_id FROM x_oauth_states WHERE state = $1`,
     [state],
   );
   if (!row) throw new Error('unknown or expired OAuth state');
 
+  // The session is read from the state row rather than the incoming request, so
+  // a callback cannot be redirected into a different session than the one that
+  // started the flow.
+  const actor: XActor = row.session_id ? { sessionId: row.session_id } : 'server';
+  const creds = await credentialsFor(actor);
+
   const res = await fetch(TOKEN, {
     method: 'POST',
     headers: {
-      Authorization: `Basic ${basicAuth()}`,
+      Authorization: `Basic ${basicAuth(creds)}`,
       'content-type': 'application/x-www-form-urlencoded',
     },
     body: new URLSearchParams({
@@ -102,7 +151,7 @@ export async function completeAuthorization(code: string, state: string): Promis
       code,
       redirect_uri: env.xCallbackUrl,
       code_verifier: row.code_verifier,
-      client_id: env.xClientId,
+      client_id: creds.clientId,
     }),
   });
 
@@ -124,14 +173,27 @@ export async function completeAuthorization(code: string, state: string): Promis
     headers: { Authorization: `Bearer ${json.access_token}` },
   }).then((r) => r.json() as Promise<{ data?: { id: string; username: string } }>);
 
+  /*
+   * A visitor's authorization is keyed on their session, so it can never
+   * overwrite the deployment's own account. Only the server flow writes
+   * 'x_primary'.
+   */
   const rows = await query<XAccount>(
-    `INSERT INTO x_accounts (id, x_user_id, username, access_token, refresh_token, scope, expires_at)
-     VALUES ('x_primary', $1, $2, $3, $4, $5, now() + make_interval(secs => $6))
-     ON CONFLICT (id) DO UPDATE SET
-       x_user_id = EXCLUDED.x_user_id, username = EXCLUDED.username,
-       access_token = EXCLUDED.access_token, refresh_token = EXCLUDED.refresh_token,
-       scope = EXCLUDED.scope, expires_at = EXCLUDED.expires_at, updated_at = now()
-     RETURNING *`,
+    actor === 'server'
+      ? `INSERT INTO x_accounts (id, x_user_id, username, access_token, refresh_token, scope, expires_at)
+         VALUES ('x_primary', $1, $2, $3, $4, $5, now() + make_interval(secs => $6))
+         ON CONFLICT (id) DO UPDATE SET
+           x_user_id = EXCLUDED.x_user_id, username = EXCLUDED.username,
+           access_token = EXCLUDED.access_token, refresh_token = EXCLUDED.refresh_token,
+           scope = EXCLUDED.scope, expires_at = EXCLUDED.expires_at, updated_at = now()
+         RETURNING *`
+      : `INSERT INTO x_accounts (id, x_user_id, username, access_token, refresh_token, scope, expires_at, session_id)
+         VALUES ($7, $1, $2, $3, $4, $5, now() + make_interval(secs => $6), $8)
+         ON CONFLICT (session_id) WHERE session_id IS NOT NULL DO UPDATE SET
+           x_user_id = EXCLUDED.x_user_id, username = EXCLUDED.username,
+           access_token = EXCLUDED.access_token, refresh_token = EXCLUDED.refresh_token,
+           scope = EXCLUDED.scope, expires_at = EXCLUDED.expires_at, updated_at = now()
+         RETURNING *`,
     [
       me.data?.id ?? '',
       me.data?.username ?? '',
@@ -139,34 +201,50 @@ export async function completeAuthorization(code: string, state: string): Promis
       json.refresh_token ?? '',
       json.scope ?? '',
       json.expires_in ?? 7200,
+      ...(actor === 'server' ? [] : [`xac_${row.session_id}`.slice(0, 120), row.session_id]),
     ],
   );
   return rows[0];
 }
 
-export async function account(): Promise<XAccount | null> {
-  return one<XAccount>(`SELECT * FROM x_accounts WHERE id = 'x_primary'`);
+export async function account(actor: XActor = 'server'): Promise<XAccount | null> {
+  return actor === 'server'
+    ? one<XAccount>(`SELECT * FROM x_accounts WHERE id = 'x_primary'`)
+    : one<XAccount>(`SELECT * FROM x_accounts WHERE session_id = $1`, [actor.sessionId]);
 }
 
-/** Returns a valid access token, refreshing first when it is close to expiry. */
-async function accessToken(): Promise<string> {
-  const acct = await account();
-  if (!acct) throw new Error('no X account connected — visit /api/x/login to authorize');
+/**
+ * A valid access token for this actor, refreshed if it is close to expiry.
+ *
+ * There is deliberately no fallback from a session to the server account. A
+ * visitor whose authorization is missing gets an error, because the alternative
+ * is quietly acting as the owner.
+ */
+async function accessToken(actor: XActor): Promise<string> {
+  const acct = await account(actor);
+  if (!acct) {
+    throw new Error(
+      actor === 'server'
+        ? 'no X account connected — visit /api/x/login to authorize'
+        : 'connect your own X account before running this',
+    );
+  }
 
   const expiresAt = acct.expires_at ? new Date(acct.expires_at).getTime() : 0;
   if (expiresAt - Date.now() > 60_000) return acct.access_token;
   if (!acct.refresh_token) return acct.access_token;
 
+  const creds = await credentialsFor(actor);
   const res = await fetch(TOKEN, {
     method: 'POST',
     headers: {
-      Authorization: `Basic ${basicAuth()}`,
+      Authorization: `Basic ${basicAuth(creds)}`,
       'content-type': 'application/x-www-form-urlencoded',
     },
     body: new URLSearchParams({
       grant_type: 'refresh_token',
       refresh_token: acct.refresh_token,
-      client_id: env.xClientId,
+      client_id: creds.clientId,
     }),
   });
   const json = (await res.json()) as {
@@ -179,8 +257,8 @@ async function accessToken(): Promise<string> {
   await query(
     `UPDATE x_accounts SET access_token = $1, refresh_token = COALESCE(NULLIF($2,''), refresh_token),
             expires_at = now() + make_interval(secs => $3), updated_at = now()
-      WHERE id = 'x_primary'`,
-    [json.access_token, json.refresh_token ?? '', json.expires_in ?? 7200],
+      WHERE id = $4`,
+    [json.access_token, json.refresh_token ?? '', json.expires_in ?? 7200, acct.id],
   );
   return json.access_token;
 }
@@ -211,21 +289,31 @@ export interface FollowingPage {
  * budget is small enough that walking a large graph would spend it in one call.
  * Callers decide how deep to go.
  */
-export async function following(maxResults = 100, paginationToken?: string): Promise<FollowingPage> {
+export async function following(
+  actor: XActor,
+  maxResults = 100,
+  paginationToken?: string,
+): Promise<FollowingPage> {
   const acct = await account();
   if (!acct) return { profiles: [], nextToken: null, error: 'no X account connected' };
 
-  const token = await accessToken();
+  const token = await accessToken(actor);
 
   /*
-   * Read the network we were pointed at, not the one that authorized. The
-   * Foundry account holds the tokens and does the following and the messaging,
-   * but the network worth segmenting belongs to X_AUDIENCE_HANDLE. Reading
-   * another account's public following list is permitted with user context.
+   * Whose network gets read.
+   *
+   * The deployment's own account is pointed at X_AUDIENCE_HANDLE: it holds the
+   * tokens and does the following and the messaging, but the network worth
+   * segmenting belongs to someone else, and reading another account's public
+   * following list is permitted with user context.
+   *
+   * A visitor gets their own following list and nothing else. Pointing their
+   * run at the configured handle would hand them the owner's network, which is
+   * the thing sessions exist to prevent.
    */
   let sourceId = acct.x_user_id;
-  if (env.xAudienceHandle) {
-    const target = await lookupByUsername(env.xAudienceHandle).catch(() => null);
+  if (actor === 'server' && env.xAudienceHandle) {
+    const target = await lookupByUsername(actor, env.xAudienceHandle).catch(() => null);
     if (!target) {
       return {
         profiles: [], nextToken: null,
@@ -298,11 +386,14 @@ export async function storeProfiles(profiles: XProfile[]): Promise<number> {
  * X's user-lookup quota is per-request, not per-user, so a loop over a small
  * allowlist can exhaust the window and fail silently. One batch call cannot.
  */
-export async function lookupMany(usernames: string[]): Promise<{ profiles: XProfile[]; error: string | null }> {
+export async function lookupMany(
+  actor: XActor,
+  usernames: string[],
+): Promise<{ profiles: XProfile[]; error: string | null }> {
   const handles = usernames.map((u) => u.replace(/^@/, '').trim()).filter(Boolean).slice(0, 100);
   if (!handles.length) return { profiles: [], error: null };
 
-  const token = await accessToken();
+  const token = await accessToken(actor);
   const url = new URL(`${API}/2/users/by`);
   url.searchParams.set('usernames', handles.join(','));
   url.searchParams.set('user.fields', 'description,public_metrics');
@@ -327,8 +418,8 @@ export async function lookupMany(usernames: string[]): Promise<{ profiles: XProf
   };
 }
 
-export async function lookupByUsername(username: string): Promise<XProfile | null> {
-  const token = await accessToken();
+export async function lookupByUsername(actor: XActor, username: string): Promise<XProfile | null> {
+  const token = await accessToken(actor);
   const handle = username.replace(/^@/, '');
   const res = await fetch(
     `${API}/2/users/by/username/${encodeURIComponent(handle)}?user.fields=description,public_metrics`,
@@ -347,10 +438,10 @@ export async function lookupByUsername(username: string): Promise<XProfile | nul
   };
 }
 
-export async function follow(targetUserId: string): Promise<{ ok: boolean; error: string | null }> {
+export async function follow(actor: XActor, targetUserId: string): Promise<{ ok: boolean; error: string | null }> {
   const acct = await account();
   if (!acct) return { ok: false, error: 'no X account connected' };
-  const token = await accessToken();
+  const token = await accessToken(actor);
   const res = await fetch(`${API}/2/users/${acct.x_user_id}/following`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'content-type': 'application/json' },
@@ -364,10 +455,11 @@ export async function follow(targetUserId: string): Promise<{ ok: boolean; error
 
 /** Sends a DM. Callers must have verified consent first. */
 export async function sendDm(
+  actor: XActor,
   targetUserId: string,
   text: string,
 ): Promise<{ ok: boolean; id: string | null; error: string | null }> {
-  const token = await accessToken();
+  const token = await accessToken(actor);
   const res = await fetch(`${API}/2/dm_conversations/with/${targetUserId}/messages`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'content-type': 'application/json' },
@@ -396,10 +488,10 @@ export interface DmEvent {
  * Read rather than pushed: the Account Activity webhook delivers these too, but
  * polling works on any tier and does not depend on that product being enabled.
  */
-export async function dmEvents(maxResults = 50): Promise<{ events: DmEvent[]; error: string | null }> {
+export async function dmEvents(actor: XActor, maxResults = 50): Promise<{ events: DmEvent[]; error: string | null }> {
   const acct = await account();
   if (!acct) return { events: [], error: 'no X account connected' };
-  const token = await accessToken();
+  const token = await accessToken(actor);
 
   const url = new URL(`${API}/2/dm_events`);
   url.searchParams.set('max_results', String(Math.min(maxResults, 100)));

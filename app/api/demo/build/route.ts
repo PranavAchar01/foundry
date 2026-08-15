@@ -3,6 +3,7 @@ import { listingFor, postListing } from '@/lib/hiring';
 import { env } from '@/lib/env';
 import { spawn } from '@/lib/spawn';
 import { slugify } from '@/lib/agent';
+import * as session from '@/lib/session';
 import { errorMessage, json } from '@/lib/http';
 
 export const runtime = 'nodejs';
@@ -36,6 +37,10 @@ export async function POST(req: Request) {
     );
 
   if (!runId || !username) return fail('runId and username are required', 400);
+
+  // A build deploys a real storefront and posts real work to a marketplace.
+  const gate = await session.requireConnected();
+  if (!gate.ok) return fail(gate.error, 401);
 
   try {
     // Idempotent: a retry or a double-click gets the business this run already

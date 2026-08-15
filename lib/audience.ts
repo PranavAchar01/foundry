@@ -49,8 +49,12 @@ export interface SyncResult {
  * scarce resource here, and a full graph walk would spend a month of Basic-tier
  * budget in a single call.
  */
-export async function sync(pageSize = 100, pageToken?: string): Promise<SyncResult> {
-  const page = await x.following(pageSize, pageToken);
+export async function sync(
+  actor: x.XActor,
+  pageSize = 100,
+  pageToken?: string,
+): Promise<SyncResult> {
+  const page = await x.following(actor, pageSize, pageToken);
   if (page.error) {
     return { fetched: 0, stored: 0, total: await x.audienceSize(), nextToken: null, error: page.error };
   }

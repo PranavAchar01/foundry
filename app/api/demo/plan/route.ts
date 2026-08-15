@@ -2,6 +2,7 @@ import * as cohort from '@/lib/cohort';
 import * as decisions from '@/lib/decisions';
 import { deriveNiche, PLAN_ACTION, type PlannedTarget } from '@/lib/personal';
 import { query } from '@/lib/db';
+import * as session from '@/lib/session';
 import { errorMessage, json } from '@/lib/http';
 
 export const runtime = 'nodejs';
@@ -22,6 +23,11 @@ export const maxDuration = 300;
  */
 export async function POST() {
   try {
+    // The run this plans spends real money and ends in real messages, so the
+    // visitor brings their own X account before any of it starts.
+    const gate = await session.requireConnected();
+    if (!gate.ok) return json({ error: gate.error }, { status: 401 });
+
     const runId = decisions.newCycleId();
 
     const [allowed, poolRows] = await Promise.all([

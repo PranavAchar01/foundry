@@ -265,7 +265,7 @@ export async function respond(conversation: Conversation): Promise<ReplyOutcome>
     };
   }
 
-  const sent = await x.sendDm(conversation.x_user_id, message);
+  const sent = await x.sendDm('server', conversation.x_user_id, message);
   if (!sent.ok) {
     return { ...base, replied: false, message, reasoning: out.value.reasoning, error: sent.error };
   }
@@ -396,7 +396,7 @@ export interface PollResult {
  * answers the ones that are still open.
  */
 export async function poll(): Promise<PollResult> {
-  const events = await x.dmEvents(50);
+  const events = await x.dmEvents('server', 50);
   if (events.error) return { fetched: 0, matched: 0, replies: [], error: events.error };
 
   const account = await x.account();

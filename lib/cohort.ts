@@ -26,7 +26,11 @@ export interface CohortMember {
 }
 
 /** Records that someone agreed to be contacted, and resolves their X id. */
-export async function add(username: string, note = 'volunteered for the demo'): Promise<CohortMember> {
+export async function add(
+  username: string,
+  note = 'volunteered for the demo',
+  actor: x.XActor = 'server',
+): Promise<CohortMember> {
   const handle = username.replace(/^@/, '').trim();
   if (!handle) throw new Error('username is required');
 
@@ -36,7 +40,7 @@ export async function add(username: string, note = 'volunteered for the demo'): 
   let xUserId = '';
   let bio = '';
   try {
-    const profile = await x.lookupByUsername(handle);
+    const profile = await x.lookupByUsername(actor, handle);
     xUserId = profile?.id ?? '';
     bio = (profile?.description ?? '').replace(/\s+/g, ' ').trim().slice(0, 500);
   } catch {
@@ -62,12 +66,12 @@ export async function add(username: string, note = 'volunteered for the demo'): 
  * One batch request, so re-running it is cheap and cannot burn the lookup
  * window the way a loop of single lookups does.
  */
-export async function hydrate(): Promise<{ updated: number; error: string | null }> {
+export async function hydrate(actor: x.XActor = 'server'): Promise<{ updated: number; error: string | null }> {
   const members = await list();
   const stale = members.filter((m) => !m.bio || !m.x_user_id);
   if (!stale.length) return { updated: 0, error: null };
 
-  const { profiles, error } = await x.lookupMany(stale.map((m) => m.username));
+  const { profiles, error } = await x.lookupMany(actor, stale.map((m) => m.username));
   if (error) return { updated: 0, error };
 
   let updated = 0;
