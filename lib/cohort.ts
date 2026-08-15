@@ -19,6 +19,7 @@ export interface CohortMember {
   username: string;
   x_user_id: string;
   note: string;
+  bio: string;
   followed: boolean;
   dm_sent_at: string | null;
   created_at: string;
@@ -29,25 +30,59 @@ export async function add(username: string, note = 'volunteered for the demo'): 
   const handle = username.replace(/^@/, '').trim();
   if (!handle) throw new Error('username is required');
 
-  // Resolve the handle now so the send path never has to guess.
+  // Resolve the handle now so the send path never has to guess, and keep the
+  // bio: it is the only evidence available for allowlist members who are not in
+  // the follow graph.
   let xUserId = '';
+  let bio = '';
   try {
     const profile = await x.lookupByUsername(handle);
     xUserId = profile?.id ?? '';
+    bio = (profile?.description ?? '').replace(/\s+/g, ' ').trim().slice(0, 500);
   } catch {
     xUserId = '';
   }
 
   const rows = await query<CohortMember>(
-    `INSERT INTO consent_cohort (id, username, x_user_id, note)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO consent_cohort (id, username, x_user_id, note, bio)
+     VALUES ($1, $2, $3, $4, $5)
      ON CONFLICT (username) DO UPDATE SET
        x_user_id = COALESCE(NULLIF(EXCLUDED.x_user_id, ''), consent_cohort.x_user_id),
-       note = EXCLUDED.note
+       note = EXCLUDED.note,
+       bio = COALESCE(NULLIF(EXCLUDED.bio, ''), consent_cohort.bio)
      RETURNING *`,
-    [id('coh'), handle, xUserId, note.slice(0, 300)],
+    [id('coh'), handle, xUserId, note.slice(0, 300), bio],
   );
   return rows[0];
+}
+
+/**
+ * Fill in missing evidence for everyone already on the allowlist.
+ *
+ * One batch request, so re-running it is cheap and cannot burn the lookup
+ * window the way a loop of single lookups does.
+ */
+export async function hydrate(): Promise<{ updated: number; error: string | null }> {
+  const members = await list();
+  const stale = members.filter((m) => !m.bio || !m.x_user_id);
+  if (!stale.length) return { updated: 0, error: null };
+
+  const { profiles, error } = await x.lookupMany(stale.map((m) => m.username));
+  if (error) return { updated: 0, error };
+
+  let updated = 0;
+  for (const p of profiles) {
+    const bio = (p.description ?? '').replace(/\s+/g, ' ').trim().slice(0, 500);
+    await query(
+      `UPDATE consent_cohort
+          SET x_user_id = COALESCE(NULLIF($2, ''), x_user_id),
+              bio       = COALESCE(NULLIF($3, ''), bio)
+        WHERE lower(username) = lower($1)`,
+      [p.username, p.id, bio],
+    );
+    updated++;
+  }
+  return { updated, error: null };
 }
 
 export async function list(): Promise<CohortMember[]> {

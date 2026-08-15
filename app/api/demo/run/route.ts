@@ -6,6 +6,7 @@ import { hireForSegment } from '@/lib/hiring';
 import { spawn } from '@/lib/spawn';
 import { slugify } from '@/lib/agent';
 import * as x from '@/lib/x';
+import * as conversation from '@/lib/conversation';
 import { env } from '@/lib/env';
 import { errorMessage, json } from '@/lib/http';
 
@@ -147,11 +148,21 @@ export async function POST(req: Request) {
           if (f.ok) await cohort.markFollowed(member.username);
         }
 
-        const message = personalise(draft.message, business.url);
+        const message = personalise(draft.message);
         const sent = await x.sendDm(gate.x_user_id, message);
         if (sent.ok) {
           await cohort.markDmSent(member.username);
           await prospects.markSent(draft.id);
+          // Opening a conversation is what puts this person under the reply
+          // agent: from here it answers what comes back until it closes.
+          await conversation.open({
+            username: member.username,
+            xUserId: gate.x_user_id,
+            businessId: business.id,
+            segmentId: segment.id,
+            text: message,
+            externalId: sent.id,
+          });
         }
         reach.push({
           username: member.username,
@@ -204,8 +215,11 @@ export async function POST(req: Request) {
   }
 }
 
-/** Appends the storefront link if the model did not already include it. */
-function personalise(message: string, url: string | null): string {
-  if (!url || message.includes(url)) return message;
-  return `${message}\n\n${url}`;
+/**
+ * The opener stays short on purpose — no appended link. The link is what the
+ * agent offers once someone replies, which is what makes the first message read
+ * as an opening rather than a broadcast.
+ */
+function personalise(message: string): string {
+  return message.slice(0, 260);
 }

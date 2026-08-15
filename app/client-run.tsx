@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Scan from './scan';
 
 /**
@@ -40,6 +40,7 @@ export default function ClientRun() {
   const [pool, setPool] = useState<string[]>([]);
   const [chosen, setChosen] = useState<{ username: string; reason?: string }[]>([]);
   const [scanning, setScanning] = useState(false);
+  const scanRef = useRef<HTMLDivElement | null>(null);
 
   // The sweep streams the real network and lands on the real allowlist, so both
   // are loaded before the button is pressed rather than invented on the fly.
@@ -48,19 +49,55 @@ export default function ClientRun() {
       .then((r) => r.json())
       .then((j) => {
         setPool((j.pool ?? []) as string[]);
-        setChosen(((j.cohort ?? []) as { username: string; note: string }[]).map((c) => ({
-          username: c.username,
-          reason: 'targetable · building something',
-        })));
+        setChosen(
+          ((j.cohort ?? []) as { username: string; evidence?: string }[]).map((c) => ({
+            username: c.username,
+            reason: c.evidence || 'matched on profile signals',
+          })),
+        );
       })
       .catch(() => {});
   }, []);
+
+  /*
+   * The sweep is the point of the button, so bring it into view rather than
+   * running it below the fold. This waits for the scan to actually mount — the
+   * ref is still null in the click handler and in the frame right after it.
+   *
+   * The glide is hand-rolled because native smooth scrolling is a no-op on this
+   * page: something above cancels the browser's animation, and an instant jump
+   * is a worse answer than owning the easing.
+   */
+  useEffect(() => {
+    const el = scanRef.current;
+    if (!scanning || !el) return;
+
+    const target = Math.max(
+      0,
+      window.scrollY + el.getBoundingClientRect().top - (window.innerHeight - el.offsetHeight) / 2,
+    );
+    const from = window.scrollY;
+    const distance = target - from;
+    if (Math.abs(distance) < 8) return;
+
+    const DURATION = 520;
+    let raf = 0;
+    const started = performance.now();
+    const step = (now: number) => {
+      const t = Math.min(1, (now - started) / DURATION);
+      const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      window.scrollTo(0, from + distance * eased);
+      if (t < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [scanning]);
 
   const run = async (dryRun: boolean) => {
     setRunning(true);
     setError(null);
     setResult(null);
-    if (!dryRun) setScanning(true);
+    setScanning(true);
     try {
       const res = await fetch('/api/demo/run', {
         method: 'POST',
@@ -106,7 +143,7 @@ export default function ClientRun() {
       </div>
 
       {scanning && (
-        <div className="mt-5">
+        <div ref={scanRef} className="mt-5 scroll-mt-24">
           <Scan pool={pool} chosen={chosen} active={scanning} />
         </div>
       )}

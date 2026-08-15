@@ -379,3 +379,76 @@ h3 {
     filter: none !important;
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * The network sweep.
+ *
+ * Row emphasis is CSS, not React state: the reel crosses hundreds of rows in a
+ * few seconds, and re-rendering the list every frame starves the main thread badly
+ * enough that the scroll animation beside it stops running. The rAF loop moves
+ * one transform and toggles one class, so the cost per frame is constant no
+ * matter how large the network is.
+ * ------------------------------------------------------------------------- */
+.scan-row {
+  display: flex;
+  align-items: center;
+  padding: 0 1.25rem;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 12.5px;
+  color: var(--color-dim);
+  opacity: 0.42;
+  transition:
+    opacity 0.18s ease-out,
+    color 0.18s ease-out;
+}
+
+.scan-row.is-match {
+  color: var(--color-muted);
+  opacity: 0.6;
+}
+
+.scan-row.is-current {
+  color: var(--color-fg);
+  opacity: 1;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.scan-row .scan-match {
+  margin-left: auto;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--color-fg);
+  opacity: 0;
+  transition: opacity 0.14s ease-out;
+}
+
+.scan-row.is-current .scan-match {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scan-row,
+  .scan-row .scan-match {
+    transition: none;
+  }
+}
+
+/* The reticle sits still; it brightens for a beat when a match crosses it. */
+.reticle {
+  border-color: color-mix(in oklab, var(--color-fg) 20%, transparent);
+  transition:
+    border-color 0.2s ease-out,
+    background-color 0.2s ease-out;
+}
+
+.reticle.reticle-hot {
+  border-color: var(--color-fg);
+  background-color: color-mix(in oklab, var(--color-fg) 6%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reticle {
+    transition: none;
+  }
+}

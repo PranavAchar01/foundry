@@ -291,6 +291,42 @@ export async function storeProfiles(profiles: XProfile[]): Promise<number> {
 // ---------------------------------------------------------------------------
 
 /** Resolves a handle to its numeric id. */
+/**
+ * Resolve up to 100 handles in one request.
+ *
+ * The per-handle endpoint is cheap to call but expensive to call eight times:
+ * X's user-lookup quota is per-request, not per-user, so a loop over a small
+ * allowlist can exhaust the window and fail silently. One batch call cannot.
+ */
+export async function lookupMany(usernames: string[]): Promise<{ profiles: XProfile[]; error: string | null }> {
+  const handles = usernames.map((u) => u.replace(/^@/, '').trim()).filter(Boolean).slice(0, 100);
+  if (!handles.length) return { profiles: [], error: null };
+
+  const token = await accessToken();
+  const url = new URL(`${API}/2/users/by`);
+  url.searchParams.set('usernames', handles.join(','));
+  url.searchParams.set('user.fields', 'description,public_metrics');
+
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  const json = (await res.json().catch(() => ({}))) as {
+    data?: { id: string; username: string; name: string; description?: string; public_metrics?: { followers_count?: number } }[];
+    detail?: string;
+    title?: string;
+  };
+  if (!res.ok) return { profiles: [], error: json.detail ?? json.title ?? `x users/by ${res.status}` };
+
+  return {
+    profiles: (json.data ?? []).map((d) => ({
+      id: d.id,
+      username: d.username,
+      name: d.name,
+      description: d.description ?? '',
+      followers: d.public_metrics?.followers_count ?? 0,
+    })),
+    error: null,
+  };
+}
+
 export async function lookupByUsername(username: string): Promise<XProfile | null> {
   const token = await accessToken();
   const handle = username.replace(/^@/, '');
@@ -345,6 +381,49 @@ export async function sendDm(
   return res.ok
     ? { ok: true, id: json.data?.dm_event_id ?? null, error: null }
     : { ok: false, id: null, error: `${res.status} ${json.title ?? ''} ${json.detail ?? ''}`.trim() };
+}
+
+export interface DmEvent {
+  id: string;
+  senderId: string;
+  text: string;
+  createdAt: string;
+}
+
+/**
+ * Recent DM events across every conversation the account is in.
+ *
+ * Read rather than pushed: the Account Activity webhook delivers these too, but
+ * polling works on any tier and does not depend on that product being enabled.
+ */
+export async function dmEvents(maxResults = 50): Promise<{ events: DmEvent[]; error: string | null }> {
+  const acct = await account();
+  if (!acct) return { events: [], error: 'no X account connected' };
+  const token = await accessToken();
+
+  const url = new URL(`${API}/2/dm_events`);
+  url.searchParams.set('max_results', String(Math.min(maxResults, 100)));
+  url.searchParams.set('dm_event.fields', 'id,text,created_at,sender_id,dm_conversation_id');
+  url.searchParams.set('event_types', 'MessageCreate');
+
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  const json = (await res.json().catch(() => ({}))) as {
+    data?: { id: string; text?: string; sender_id?: string; created_at?: string }[];
+    title?: string;
+    detail?: string;
+  };
+  if (!res.ok) {
+    return { events: [], error: `x dm_events -> ${res.status} ${json.title ?? ''} ${json.detail ?? ''}`.trim() };
+  }
+  return {
+    events: (json.data ?? []).map((d) => ({
+      id: d.id,
+      senderId: d.sender_id ?? '',
+      text: d.text ?? '',
+      createdAt: d.created_at ?? '',
+    })),
+    error: null,
+  };
 }
 
 export async function audienceSize(): Promise<number> {
