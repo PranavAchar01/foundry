@@ -16,6 +16,7 @@ export interface BusinessRow {
   visitors: number;
   conversions: number;
   is_fixture: boolean;
+  archived: boolean;
   kill_reason: string | null;
   killed_at: string | null;
   meta: Record<string, unknown>;
@@ -25,7 +26,7 @@ export interface BusinessRow {
 
 export async function list(includeFixtures = false): Promise<BusinessRow[]> {
   return query<BusinessRow>(
-    `SELECT * FROM businesses ${includeFixtures ? '' : 'WHERE NOT is_fixture'}
+    `SELECT * FROM businesses ${includeFixtures ? '' : 'WHERE NOT is_fixture AND NOT archived'}
      ORDER BY created_at DESC`,
   );
 }
@@ -37,13 +38,16 @@ export async function get(businessId: string): Promise<BusinessRow | null> {
 
 export async function live(): Promise<BusinessRow[]> {
   return query<BusinessRow>(
-    `SELECT * FROM businesses WHERE status <> 'KILLED' AND NOT is_fixture ORDER BY created_at ASC`,
+    `SELECT * FROM businesses
+      WHERE status <> 'KILLED' AND NOT is_fixture AND NOT archived
+      ORDER BY created_at ASC`,
   );
 }
 
 export async function countActive(): Promise<number> {
   const rows = await query<{ n: string }>(
-    `SELECT COUNT(*) AS n FROM businesses WHERE status <> 'KILLED' AND NOT is_fixture`,
+    `SELECT COUNT(*) AS n FROM businesses
+      WHERE status <> 'KILLED' AND NOT is_fixture AND NOT archived`,
   );
   return Number(rows[0]?.n ?? 0);
 }
@@ -51,7 +55,7 @@ export async function countActive(): Promise<number> {
 /** Real, measured pageviews — never a number the agent made up. */
 export async function recordVisit(
   businessId: string,
-  opts: { path?: string; referrer?: string; source?: string } = {},
+  opts: { path?: string; referrer?: string; source?: string; counted?: boolean } = {},
 ): Promise<void> {
   await query(
     `INSERT INTO visits (id, business_id, path, referrer, source)
@@ -64,6 +68,11 @@ export async function recordVisit(
       opts.source ?? 'organic',
     ],
   );
+
+  // Every load is logged, but only real outside traffic moves the number the
+  // agent makes kill decisions on.
+  if (opts.counted === false) return;
+
   await query(
     `UPDATE businesses SET visitors = visitors + 1, updated_at = now() WHERE id = $1`,
     [businessId],

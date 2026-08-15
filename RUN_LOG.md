@@ -562,3 +562,67 @@ intact. Live cycles are recording into `foundry:ceo.cycle.started` and
 
 Gate: lint clean, typecheck clean, build clean, **41 passed / 10 skipped**.
 Deployed and confirmed in the browser.
+
+## 2026-08-15 — Iteration 18 · one page, a wall of companies, and a reset
+
+Owner asked for a single-page tile dashboard showing each company's hero page,
+a click-through detail view, a wipe of the Vercel storefronts, and a visually
+distinguishable hero for Lovable-built sites.
+
+### Reset
+
+`scripts/reset-portfolio.mjs` (with a `--dry` plan mode), ordered so a failure
+never orphans a paid resource from its record: kill every Superserve machine →
+delete every spawned Vercel project → archive the businesses.
+
+Executed: **8/8 machines destroyed, 9/9 Vercel projects deleted, 11 businesses
+archived, 25 pageviews deleted.** `foundry-biz` and `landing` are protected by
+name and were untouched.
+
+A literal `TRUNCATE` was not possible and should not be: `machine_runs` is
+append-only and `machines.business_id` is a foreign key to `businesses`, so
+deleting the rows would have required dropping the append-only guarantee. Added
+`businesses.archived` instead — hidden from the portfolio, history intact.
+`ledger_entries` (93) and `decisions` (400) survived, so the P&L still shows the
+money that was really spent.
+
+### The new UI
+
+One page. A compact header carrying identity and the P&L, then a wall of tiles —
+each tile is a **live iframe of that company's actual hero page**, scaled to
+thumbnail, with its status, VM state, and three numbers. Clicking a tile opens a
+detail overlay with six plain metrics and two tabs: *the website* and *the
+machine running it* (the VM's own served page beside its live shell), with the
+agent's recent decisions along the bottom. `app/machines.tsx` was deleted; the
+machine room now lives inside the company it belongs to.
+
+New endpoint `/api/company/[id]` assembles one company's business, traction,
+machine, decisions and shell history in a single round trip.
+
+### Lovable heroes
+
+The old brief told Lovable to build "dark, high-contrast, technical" — the exact
+house style of the internal fallback, which is why its output was
+indistinguishable. Rewritten: a full-viewport hero, the product name as the
+dominant element, price and CTA above the fold, a full-bleed visual treatment,
+and palette/typography chosen to suit *that* buyer — with an explicit
+instruction not to default to the dark monospace terminal look. Not verified
+live: `LOVABLE_API_KEY` is empty again, so the lovable path cannot run.
+
+### A measurement bug the redesign created — and one it exposed
+
+Embedding each storefront to show its hero means the dashboard **loads every
+company's page**, firing the pageview beacon. Watching the portfolio was
+inflating the exact number the CEO uses to decide whether a business is dead.
+Worse, the same was already true of the **Playwright QA check** during spawn:
+headless Chromium executes the beacon, so every spawn counted itself a visitor.
+
+`/api/track` now records every load but only counts a visitor when it is neither
+self-referred from Foundry's origin nor an automated user-agent. Both classes
+are still logged, as `dashboard-preview` and `automated-qa`, so the exclusion is
+auditable rather than invisible. Historical self-traffic was reclassified and
+the counters reset to zero — the four live companies now read a truthful
+0 visitors rather than a flattering 2.
+
+Portfolio after the reset: 4 companies, each with its own machine, spawned in
+11–14s. Gate: lint clean, typecheck clean, build clean, 41 passed / 10 skipped.

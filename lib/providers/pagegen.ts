@@ -188,8 +188,31 @@ CONTENT RULES — do not violate these:
 - Nothing aimed at minors.
 - Do not invent testimonials, customer logos, user counts, or review scores. No fake social proof of any kind.
 
-STYLE
-Dark, high-contrast, technical. Monospace for numbers and labels. Restrained — one accent colour. It should read like a tool built by an engineer, not a marketing page. Mobile responsive.`;
+HERO — this is the part that must stand out:
+
+The page opens with a full-viewport hero section, and it has to be the most
+striking thing about the site. It is seen first as a small thumbnail in a wall of
+other companies, so it must read instantly at a glance:
+
+- The product name as a very large headline — the dominant element on screen.
+- The tagline directly beneath it, one line, clearly secondary.
+- The price and the "Get it now" button both visible without scrolling.
+- A distinctive full-bleed visual treatment behind the text: a bold colour
+  field, gradient, or geometric/CSS-drawn composition. No stock photography and
+  no placeholder image services.
+
+Choose the palette and typography to suit THIS product and its buyer — a kit for
+wedding photographers should not look like a tool for game developers. Pick one
+strong, saturated accent colour that fits the niche and commit to it. Vary the
+typography with the same intent: a display serif, a heavy geometric sans, or a
+condensed grotesque, whichever matches the audience.
+
+Deliberately do NOT default to a dark, monospace, terminal aesthetic — that is
+the house style of the fallback generator and this page must be visually
+distinguishable from it at thumbnail size.
+
+Below the hero, keep it short: the key points, what the buyer receives, and the
+footer disclosure. Mobile responsive throughout.`;
 }
 
 /**
