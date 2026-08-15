@@ -80,6 +80,26 @@ h3 {
   animation: foundry-pulse 1.8s ease-in-out infinite;
 }
 
+/* Storefront iframes take seconds to paint; shimmer says "loading", not "broken". */
+@keyframes foundry-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+.shimmer {
+  background: linear-gradient(
+    100deg,
+    var(--color-panel2) 40%,
+    var(--color-accdim) 50%,
+    var(--color-panel2) 60%
+  );
+  background-size: 200% 100%;
+  animation: foundry-shimmer 1.6s linear infinite;
+}
+
 @keyframes foundry-in {
   from {
     opacity: 0;
