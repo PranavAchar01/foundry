@@ -77,7 +77,13 @@ export default function Dashboard() {
   const [open, setOpen] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
   const [latest, setLatest] = useState<Decision | null>(null);
+  const [introGo, setIntroGo] = useState(false);
   const seen = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    // Kick the hero choreography after hydration; 'both' fill keeps the end state.
+    setIntroGo(true);
+  }, []);
 
   const refresh = useCallback(async () => {
     try {
@@ -129,33 +135,49 @@ export default function Dashboard() {
   const live = data.businesses.filter((b) => b.status !== 'KILLED');
 
   return (
-    <main>
-      {/* ---- hero: the painting, the name, dusk melting into the page ---- */}
-      <header className="relative h-[300px] overflow-hidden md:h-[380px]">
-        <Image
-          src="/hero-foundry.png"
-          alt=""
-          fill
-          priority
-          sizes="100vw"
-          className="object-cover"
-        />
-        <div
-          aria-hidden
-          className="absolute inset-0"
-          style={{
-            background: 'linear-gradient(to bottom, rgba(36,21,64,0) 40%, #241540 100%)',
-          }}
-        />
-        <div className="absolute inset-x-0 bottom-0">
-          <div className="mx-auto max-w-[1500px] px-6 pb-6">
-            <h1 className="text-5xl font-normal md:text-6xl">FOUNDRY</h1>
-            <p className="mt-2 text-[13px] text-[var(--color-fg)]">
-              An autonomous holding company. {live.length} companies, each on its own machine.
+    <main className={`intro${introGo ? ' intro-go' : ''}`}>
+      {/* ---- hero: the painting inside a top-rounded card, dusk scrim, ember CTA ---- */}
+      <section className="relative h-[78vh] min-h-[520px] bg-[var(--color-bg)]">
+        <div className="absolute top-0 bottom-0 left-4 right-4 overflow-hidden rounded-t-[24px] md:left-6 md:right-6">
+          <div className="hero-media absolute inset-0">
+            <Image
+              src="/hero-foundry.png"
+              alt=""
+              fill
+              priority
+              sizes="100vw"
+              className="object-cover"
+            />
+          </div>
+          <div
+            aria-hidden
+            className="absolute inset-0"
+            style={{
+              background:
+                'linear-gradient(180deg, rgba(36,21,64,0.45) 0%, rgba(36,21,64,0) 18%, rgba(36,21,64,0) 60%, rgba(36,21,64,0.5) 85%, rgba(36,21,64,0.95) 100%)',
+            }}
+          />
+          <div className="relative flex h-full flex-col items-center justify-center px-6 text-center">
+            <p
+              className="hero-eyebrow text-[13px] tracking-[0.12em] text-[var(--color-fg)] uppercase"
+              style={{ textShadow: '0 1px 12px rgba(36,21,64,0.8)' }}
+            >
+              An autonomous holding company · {live.length} companies live
             </p>
+            <h1
+              className="hero-title text-[clamp(48px,7.2vw,88px)] leading-[1.05] font-normal tracking-[-0.015em] text-white"
+              style={{ textShadow: '0 4px 50px rgba(36,21,64,0.7)' }}
+            >
+              The holding company
+              <br />
+              with no employees.
+            </h1>
+            <a className="hero-cta btn-ember mt-9" href="#portfolio">
+              See the portfolio
+            </a>
           </div>
         </div>
-      </header>
+      </section>
 
       {/* ---- the money bar: a slim ledger line under the painting ---- */}
       <div className="border-b border-[var(--color-line)]">
@@ -175,7 +197,7 @@ export default function Dashboard() {
           <span className="ml-auto flex items-center gap-2 text-[11px] text-[var(--color-dim)]">
             <span
               className={`inline-block h-1.5 w-1.5 rounded-full ${
-                connected ? 'bg-[var(--color-acc)] pulse' : 'bg-[var(--color-dim)]'
+                connected ? 'bg-[var(--color-fg)] pulse' : 'bg-[var(--color-dim)]'
               }`}
             />
             {connected ? 'live' : 'reconnecting'}
@@ -183,7 +205,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-[1500px] px-6 py-8">
+      <div id="portfolio" className="mx-auto max-w-[1500px] px-6 py-8">
       {budget.breaker.tripped && (
         <div className="mb-6 rounded-2xl border border-[var(--color-line)] bg-[var(--color-fg)] px-5 py-3">
           <span className="font-mono text-[11px] tracking-wider text-[#241540] uppercase">
@@ -255,29 +277,80 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ---- the agent's last word, always visible, never in the way ---- */}
-      <footer className="mt-8 border-t border-[var(--color-line)] pt-4">
-        <div className="flex gap-3 font-mono text-[11px]">
-          <span className="shrink-0 tracking-wider text-[var(--color-muted)] uppercase">latest</span>
-          {latest ? (
-            <p className="line-clamp-2 text-[var(--color-dim)]">
-              <span className="font-medium text-[var(--color-fg)]">{latest.action}</span>{' '}
-              <span className="text-[var(--color-muted)]">{latest.reasoning.slice(0, 260)}</span>{' '}
-              <span>· {latest.model}</span>
-            </p>
-          ) : (
-            <p className="text-[var(--color-dim)]">no decisions yet</p>
-          )}
-        </div>
-        <p className="mt-3 font-mono text-[10px] text-[var(--color-dim)]">
-          {data.providers.map((p) => `${p.capability}=${p.active}`).join(' · ')}
-        </p>
-        <p className="mt-2 text-[11px] text-[var(--color-muted)]">
-          Every company on this page — and this page itself — is operated end-to-end by an AI
-          agent. No human runs these businesses.
-        </p>
-      </footer>
       </div>
+
+      {/* ---- the ember slab: Priceflag's footer, recast pink ---- */}
+      <footer className="foot-slab mt-16">
+        <div className="mx-auto max-w-[1520px] px-5 pt-12 pb-5 md:px-12 md:pt-16">
+          <div className="flex flex-wrap justify-between gap-10">
+            <div className="flex flex-col items-start gap-5">
+              <span className="text-[21px]" style={{ fontFamily: 'var(--font-serif)' }}>
+                Foundry
+              </span>
+              <h2 className="max-w-[18ch] text-[clamp(29px,3.4vw,50px)] leading-[1.1] font-normal tracking-[-0.02em]">
+                Companies run by machines, audited by anyone.
+              </h2>
+              {latest ? (
+                <p className="text-[13px]" style={{ color: 'var(--foot-ink-soft)' }}>
+                  <span className="font-medium">{latest.action}</span>{' '}
+                  {latest.reasoning.slice(0, 260)} · {latest.model}
+                </p>
+              ) : (
+                <p className="text-[13px]" style={{ color: 'var(--foot-ink-soft)' }}>
+                  no decisions yet
+                </p>
+              )}
+              <a
+                className="btn-plum"
+                href="https://github.com/PranavAchar01/foundry"
+                target="_blank"
+                rel="noreferrer"
+              >
+                See the source ↗
+              </a>
+            </div>
+            <nav>
+              <ul className="space-y-2 text-[14px] font-medium">
+                <li>
+                  <a href="#portfolio">Portfolio</a>
+                </li>
+                <li>
+                  <a href="/api/health">Health</a>
+                </li>
+                <li>
+                  <a href="/api/providers">Providers</a>
+                </li>
+                <li>
+                  <a href="/api/stream">Decision stream</a>
+                </li>
+              </ul>
+            </nav>
+          </div>
+          <svg className="foot-word" viewBox="0 0 720 130" aria-hidden>
+            <text
+              x="360"
+              y="104"
+              textAnchor="middle"
+              fontSize="130"
+              style={{ fontFamily: 'var(--font-serif)' }}
+              textLength="700"
+              lengthAdjust="spacingAndGlyphs"
+            >
+              FOUNDRY
+            </text>
+          </svg>
+          <div
+            className="mt-8 flex flex-wrap justify-between gap-3 border-t pt-4 text-[12px]"
+            style={{ borderColor: 'var(--foot-rule)', color: 'var(--foot-ink-soft)' }}
+          >
+            <span>
+              Every company on this page — and this page itself — is operated end-to-end by an AI
+              agent. No human runs these businesses.
+            </span>
+            <span>{data.providers.map((p) => `${p.capability}=${p.active}`).join(' · ')}</span>
+          </div>
+        </div>
+      </footer>
 
       {open && <CompanyDetail id={open} onClose={() => setOpen(null)} />}
     </main>
