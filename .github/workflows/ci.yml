@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: lint · typecheck · build · test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      # Non-secret configuration, mirroring .env.local.
+      FOUNDRY_MODEL: claude-opus-5
+      STRIPE_PAYMENT_METHOD_TYPES: card
+      FOUNDRY_PUBLIC_URL: https://foundry-biz.vercel.app
+      TERAC_API_BASE: https://terac.com/api/external/v2
+      TERAC_ESCALATION_THRESHOLD: '0.65'
+      TERAC_MAX_SPEND_USD: '40'
+      FOUNDRY_TOTAL_BUDGET_USD: '150'
+      FOUNDRY_PER_BUSINESS_BUDGET_USD: '25'
+      FOUNDRY_KILL_THRESHOLD_VISITORS: '40'
+      FOUNDRY_KILL_THRESHOLD_CONVERSIONS: '0'
+      FOUNDRY_MAX_BUSINESSES: '8'
+      FOUNDRY_CIRCUIT_BREAKER: 'on'
+      FOUNDRY_PAGEGEN_PROVIDER: internal
+      FOUNDRY_CHECKOUT_PROVIDER: stripe
+      FOUNDRY_SANDBOX_PROVIDER: vercel
+      FOUNDRY_BUS_PROVIDER: postgres
+      FOUNDRY_SUPPORT_PROVIDER: resend
+      FOUNDRY_QA_PROVIDER: playwright
+      FOUNDRY_HOST_PROVIDER: vercel
+      FOUNDRY_DISCLOSURE_LINE: 'This business is operated end-to-end by an AI agent. No human wrote this.'
+
+      # Secrets, resolved at job level so the steps below can branch on whether
+      # they are configured. Absent secrets resolve to an empty string.
+      POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
+      POSTGRES_URL_NON_POOLING: ${{ secrets.POSTGRES_URL_NON_POOLING }}
+      STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+      STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Build
+        run: pnpm build
+
+      # Always runs: provider registry, template rendering, escaping. No network,
+      # no database — this is the suite that proves the flag swap needs no code.
+      - name: Test (no external dependencies)
+        run: pnpm vitest run tests/providers.test.ts
+
+      # Runs only when the repository has secrets configured. These hit the real
+      # Neon database and replay a real signed Stripe payload.
+      - name: Test (integration)
+        if: env.POSTGRES_URL != ''
+        run: pnpm test
+
+      - name: Note when the integration suite was skipped
+        if: env.POSTGRES_URL == ''
+        run: echo "::warning::POSTGRES_URL secret is not set — the integration suite was skipped."

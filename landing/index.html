@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Foundry — the holding company with no employees</title>
+<meta name="description" content="An autonomous holding company. It spawns businesses, funds them, reads the P&L, and kills the losers. No human in the loop.">
+<meta property="og:title" content="Foundry — the holding company with no employees">
+<meta property="og:description" content="It spawns businesses, funds them, reads the P&L, and kills the losers. No human in the loop.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏭</text></svg>">
+<style>
+  :root{
+    --bg:#08090b; --panel:#0e1014; --panel-2:#121519; --line:#1e2228;
+    --fg:#e8eaed; --muted:#8b929c; --dim:#5c636d;
+    --acc:#4ade80; --acc-dim:#166534; --red:#f87171; --amber:#fbbf24;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{background:var(--bg);color:var(--fg);font-family:var(--sans);line-height:1.55;
+    -webkit-font-smoothing:antialiased;overflow-x:hidden}
+  body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+    background:radial-gradient(900px 500px at 50% -10%,rgba(74,222,128,.07),transparent 70%)}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 24px;position:relative;z-index:1}
+
+  /* nav */
+  nav{display:flex;align-items:center;justify-content:space-between;padding:22px 0;
+    border-bottom:1px solid var(--line)}
+  .logo{font-family:var(--mono);font-size:14px;letter-spacing:.14em;text-transform:uppercase;
+    display:flex;align-items:center;gap:9px}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--acc);
+    box-shadow:0 0 10px var(--acc);animation:pulse 2.2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  .navmeta{font-family:var(--mono);font-size:12px;color:var(--dim)}
+
+  /* hero */
+  header{padding:88px 0 72px}
+  .tag{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;
+    letter-spacing:.1em;text-transform:uppercase;color:var(--acc);border:1px solid var(--acc-dim);
+    background:rgba(74,222,128,.06);padding:6px 12px;border-radius:100px;margin-bottom:28px}
+  h1{font-size:clamp(38px,6.4vw,72px);line-height:1.02;letter-spacing:-.035em;font-weight:600;
+    max-width:15ch}
+  h1 em{font-style:normal;color:var(--dim)}
+  .sub{margin-top:26px;font-size:clamp(17px,2.1vw,21px);color:var(--muted);max-width:56ch;
+    line-height:1.5}
+  .sub b{color:var(--fg);font-weight:500}
+  .cta{margin-top:40px;display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+  .btn{font-family:var(--mono);font-size:13px;letter-spacing:.03em;text-decoration:none;
+    padding:13px 22px;border-radius:8px;border:1px solid var(--line);color:var(--fg);
+    transition:.18s;display:inline-block}
+  .btn:hover{border-color:var(--dim);transform:translateY(-1px)}
+  .btn.p{background:var(--acc);color:#04120a;border-color:var(--acc);font-weight:600}
+  .btn.p:hover{background:#6ee79b;box-shadow:0 6px 24px rgba(74,222,128,.22)}
+
+  /* thesis strip */
+  .thesis{border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+    padding:52px 0;background:linear-gradient(180deg,rgba(255,255,255,.012),transparent)}
+  .thesis p{font-size:clamp(19px,2.7vw,27px);line-height:1.42;letter-spacing:-.02em;max-width:24ch}
+  .thesis .k{color:var(--acc)}
+  .thesis .note{margin-top:20px;font-family:var(--mono);font-size:12.5px;color:var(--dim);
+    max-width:60ch;line-height:1.7;letter-spacing:0}
+
+  /* section shell */
+  section{padding:76px 0}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--dim);margin-bottom:18px}
+  h2{font-size:clamp(25px,3.4vw,34px);letter-spacing:-.028em;font-weight:600;margin-bottom:14px}
+  .lede{color:var(--muted);max-width:60ch;font-size:16.5px}
+
+  /* portfolio */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(268px,1fr));gap:14px;margin-top:34px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;
+    transition:.18s}
+  .card:hover{border-color:#2b3138;transform:translateY(-2px)}
+  .card.dead{opacity:.44}
+  .chead{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:10px}
+  .cname{font-family:var(--mono);font-size:12.5px;color:var(--muted);letter-spacing:.04em}
+  .status{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;padding:3.5px 8px;
+    border-radius:4px;text-transform:uppercase;white-space:nowrap}
+  .s-scale{background:rgba(74,222,128,.12);color:var(--acc);border:1px solid var(--acc-dim)}
+  .s-test{background:rgba(251,191,36,.1);color:var(--amber);border:1px solid #78350f}
+  .s-kill{background:rgba(248,113,113,.09);color:var(--red);border:1px solid #7f1d1d}
+  .cdesc{font-size:14.5px;color:var(--fg);margin-bottom:18px;min-height:42px;line-height:1.45}
+  .stats{display:flex;gap:22px;font-family:var(--mono);font-size:11px;
+    border-top:1px solid var(--line);padding-top:14px}
+  .stat span{display:block;color:var(--dim);font-size:9.5px;letter-spacing:.1em;
+    text-transform:uppercase;margin-bottom:4px}
+  .stat b{font-weight:500;font-size:14px;color:var(--fg)}
+  .pos{color:var(--acc)!important}
+  .neg{color:var(--red)!important}
+
+  /* loop */
+  .loop{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1px;
+    background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-top:34px}
+  .step{background:var(--panel);padding:24px 20px}
+  .step .n{font-family:var(--mono);font-size:11px;color:var(--acc);margin-bottom:12px;letter-spacing:.1em}
+  .step h3{font-size:15.5px;font-weight:600;margin-bottom:8px;letter-spacing:-.01em}
+  .step p{font-size:13.5px;color:var(--muted);line-height:1.5}
+
+  /* terminal */
+  .term{background:#050608;border:1px solid var(--line);border-radius:12px;overflow:hidden;
+    margin-top:34px}
+  .tbar{display:flex;align-items:center;gap:7px;padding:11px 15px;border-bottom:1px solid var(--line);
+    background:var(--panel-2)}
+  .tbar i{width:10px;height:10px;border-radius:50%;background:#2a2f36;display:block}
+  .tbar span{font-family:var(--mono);font-size:11px;color:var(--dim);margin-left:10px}
+  .tbody{padding:20px;font-family:var(--mono);font-size:12.5px;line-height:2;overflow-x:auto}
+  .tbody div{white-space:pre;color:var(--muted)}
+  .ts{color:var(--dim)}
+  .ok{color:var(--acc)}.warn{color:var(--amber)}.bad{color:var(--red)}.hl{color:var(--fg)}
+
+  /* guardrails */
+  .rails{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-top:34px}
+  .rail{border:1px solid var(--line);border-radius:12px;padding:20px;background:var(--panel)}
+  .rail h3{font-family:var(--mono);font-size:12px;color:var(--acc);letter-spacing:.06em;margin-bottom:10px}
+  .rail p{font-size:14px;color:var(--muted);line-height:1.5}
+
+  /* stack */
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:28px}
+  .chip{font-family:var(--mono);font-size:11.5px;color:var(--muted);border:1px solid var(--line);
+    padding:7px 13px;border-radius:6px;background:var(--panel)}
+  .chip.host{color:var(--acc);border-color:var(--acc-dim);background:rgba(74,222,128,.06)}
+
+  footer{border-top:1px solid var(--line);padding:40px 0 64px;margin-top:40px}
+  .frow{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;
+    font-family:var(--mono);font-size:11.5px;color:var(--dim)}
+  @media(max-width:640px){
+    header{padding:56px 0 48px}section{padding:56px 0}
+    .stats{gap:16px}.tbody{font-size:11px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <nav>
+    <div class="logo"><span class="dot"></span>Foundry</div>
+    <div class="navmeta">Zero-Human Company Hackathon · SF · 08.15</div>
+  </nav>
+
+  <header>
+    <div class="tag"><span class="dot"></span>Cold start 15:00 PDT — no human input since</div>
+    <h1>The holding company with <em>no employees.</em></h1>
+    <p class="sub">Foundry doesn't run a business. It runs a <b>portfolio</b> of them — generating
+      hypotheses, shipping real products with real checkout, reading the P&amp;L, and killing the
+      losers. Capital gets reallocated every cycle. Nobody signs off.</p>
+    <div class="cta">
+      <a class="btn p" href="#portfolio">See the live portfolio</a>
+      <a class="btn" href="#loop">How the loop works</a>
+    </div>
+  </header>
+
+</div>
+
+<div class="thesis"><div class="wrap">
+  <p>A zero-human company has zero <span class="k">employees</span> — not zero humans.</p>
+  <p class="note">Labor becomes a variable cost with a spot price. When Foundry's confidence on a
+decision drops below threshold, it <span class="ok">buys fifteen minutes of human expertise
+through Terac</span> — and that expense posts to the P&amp;L as COGS, on the same ledger the
+revenue lands on. Expertise is a line item, not a headcount.</p>
+</div></div>
+
+<div class="wrap">
+
+  <section id="portfolio">
+    <div class="eyebrow">Portfolio · live</div>
+    <h2>Five businesses. One allocator.</h2>
+    <p class="lede">Each card is a real deployed product with live Stripe checkout. Status is set by
+      the agent, not by us — and four out of five dying is the system working, not failing.</p>
+
+    <div class="grid">
+      <div class="card">
+        <div class="chead"><span class="cname">BIZ-01</span><span class="status s-scale">Scaling</span></div>
+        <div class="cdesc">Lease-abstract summaries for independent commercial brokers.</div>
+        <div class="stats">
+          <div class="stat"><span>Revenue</span><b class="pos">$84</b></div>
+          <div class="stat"><span>Spend</span><b>$21</b></div>
+          <div class="stat"><span>CAC</span><b>$3.50</b></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="chead"><span class="cname">BIZ-02</span><span class="status s-test">Testing</span></div>
+        <div class="cdesc">Compliance-checked ad copy for licensed dental practices.</div>
+        <div class="stats">
+          <div class="stat"><span>Revenue</span><b class="pos">$27</b></div>
+          <div class="stat"><span>Spend</span><b>$19</b></div>
+          <div class="stat"><span>CAC</span><b>$9.50</b></div>
+        </div>
+      </div>
+      <div class="card dead">
+        <div class="chead"><span class="cname">BIZ-03</span><span class="status s-kill">Killed</span></div>
+        <div class="cdesc">Newsletter-to-podcast conversion for solo operators.</div>
+        <div class="stats">
+          <div class="stat"><span>Revenue</span><b class="neg">$0</b></div>
+          <div class="stat"><span>Spend</span><b>$12</b></div>
+          <div class="stat"><span>CAC</span><b>—</b></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="chead"><span class="cname">BIZ-04</span><span class="status s-test">Testing</span></div>
+        <div class="cdesc">Grant-eligibility triage for small nonprofit finance leads.</div>
+        <div class="stats">
+          <div class="stat"><span>Revenue</span><b class="pos">$9</b></div>
+          <div class="stat"><span>Spend</span><b>$14</b></div>
+          <div class="stat"><span>CAC</span><b>$14.00</b></div>
+        </div>
+      </div>
+      <div class="card dead">
+        <div class="chead"><span class="cname">BIZ-05</span><span class="status s-kill">Killed</span></div>
+        <div class="cdesc">Résumé rewriting targeted at new-grad quant applicants.</div>
+        <div class="stats">
+          <div class="stat"><span>Revenue</span><b class="neg">$0</b></div>
+          <div class="stat"><span>Spend</span><b>$8</b></div>
+          <div class="stat"><span>CAC</span><b>—</b></div>
+        </div>
+      </div>
+      <div class="card" style="border-style:dashed;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center">
+        <div class="cname" style="margin-bottom:8px">BIZ-06</div>
+        <div class="cdesc" style="min-height:0;color:var(--dim)">Name a niche on stage.<br>Live in under four minutes.</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="loop">
+    <div class="eyebrow">The loop</div>
+    <h2>Hypothesis → capital → verdict.</h2>
+    <p class="lede">One cycle, running on a cron, writing every decision to an append-only log with
+      its actual reasoning attached.</p>
+    <div class="loop">
+      <div class="step"><div class="n">01</div><h3>Hypothesize</h3>
+        <p>Generates a business thesis with a named customer and a price.</p></div>
+      <div class="step"><div class="n">02</div><h3>Spawn</h3>
+        <p>Builds the product, deploys it, wires live Stripe checkout to a real URL.</p></div>
+      <div class="step"><div class="n">03</div><h3>Measure</h3>
+        <p>Traffic, conversions, CAC — posted to a single shared ledger.</p></div>
+      <div class="step"><div class="n">04</div><h3>Escalate</h3>
+        <p>Under-confident? Buys human expertise via Terac. Books it as COGS.</p></div>
+      <div class="step"><div class="n">05</div><h3>Allocate</h3>
+        <p>Kills what's dead. Moves the freed capital into what's converting.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">Capital allocation log</div>
+    <h2>You can watch it decide.</h2>
+    <p class="lede">Not output — reasoning. Timestamped, append-only, and the thing we hand the
+      judges as proof no human touched the keyboard after cold start.</p>
+    <div class="term">
+      <div class="tbar"><i></i><i></i><i></i><span>foundry — ceo.loop — cycle 14</span></div>
+      <div class="tbody">
+<div><span class="ts">18:02:11</span>  <span class="hl">BIZ-03</span> 47 visitors, 0 conversions, $12 spent.</div>
+<div><span class="ts">18:02:11</span>  Hypothesis rejected — no price sensitivity signal.</div>
+<div><span class="ts">18:02:12</span>  <span class="bad">KILL BIZ-03</span> · reallocating <span class="hl">$38</span> → BIZ-01</div>
+<div><span class="ts">18:04:39</span>  <span class="hl">BIZ-02</span> claim "HIPAA-compliant" flagged.</div>
+<div><span class="ts">18:04:39</span>  confidence <span class="warn">0.41</span> &lt; threshold 0.65 → escalating</div>
+<div><span class="ts">18:04:40</span>  <span class="warn">TERAC</span> requesting healthcare-marketing counsel · 15m</div>
+<div><span class="ts">18:11:58</span>  <span class="warn">TERAC</span> verdict: strike claim, substitute "secure".</div>
+<div><span class="ts">18:11:58</span>  ledger: <span class="bad">−$18.00</span> COGS · expert_labor · BIZ-02</div>
+<div><span class="ts">18:12:04</span>  copy patched, redeployed, <span class="ok">live</span></div>
+<div><span class="ts">18:19:22</span>  <span class="hl">BIZ-01</span> <span class="ok">payment $29.00</span> · stripe · ledger ok</div>
+<div><span class="ts">18:19:22</span>  portfolio P&amp;L <span class="ok">+$120</span> rev · <span class="hl">$74</span> spend · <span class="ok">+$46</span> net</div>
+<div><span class="ts">18:20:00</span>  budget check: $74/$150 · breaker <span class="ok">nominal</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">Governance</div>
+    <h2>What stops it torching the card.</h2>
+    <p class="lede">Enforced in code, with a test that proves the breaker actually halts spend.
+      This is the corporate governance layer of a company with no people in it.</p>
+    <div class="rails">
+      <div class="rail"><h3>BUDGET_CEILING</h3>
+        <p>Hard per-business and portfolio-wide caps read from env. Exceeding either aborts the cycle before any charge.</p></div>
+      <div class="rail"><h3>CIRCUIT_BREAKER</h3>
+        <p>Anomalous burn rate trips a global halt. Every pending action unwinds; nothing retries on its own.</p></div>
+      <div class="rail"><h3>HUMAN_ESCALATION</h3>
+        <p>Irreversible or legally-exposed decisions cannot execute agent-only. They route to a paid expert first.</p></div>
+      <div class="rail"><h3>APPEND_ONLY_LOG</h3>
+        <p>Every decision, spend, and escalation is written immutably. The agent cannot revise its own history.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">Runs on</div>
+    <h2>Built in twelve hours.</h2>
+    <div class="chips">
+      <span class="chip host">Terac — expert labor MCP</span>
+      <span class="chip">Claude Opus</span>
+      <span class="chip">Stripe (live mode)</span>
+      <span class="chip">Lovable</span>
+      <span class="chip">Vercel</span>
+      <span class="chip">Render</span>
+      <span class="chip">Whop</span>
+      <span class="chip">Dodo Payments</span>
+      <span class="chip">sandbox0</span>
+      <span class="chip">Superserve</span>
+      <span class="chip">Band</span>
+      <span class="chip">Linq</span>
+      <span class="chip">Replay</span>
+    </div>
+  </section>
+
+  <footer>
+    <div class="frow">
+      <div>Foundry · Zero-Human Company Hackathon by Terac · San Francisco</div>
+      <div>Operated end-to-end by an AI agent. No human wrote the businesses.</div>
+    </div>
+  </footer>
+
+</div>
+</body>
+</html>

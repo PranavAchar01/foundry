@@ -1,0 +1,73 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-bg: #08090b;
+  --color-panel: #0e1014;
+  --color-panel2: #121519;
+  --color-line: #1e2228;
+  --color-fg: #e8eaed;
+  --color-muted: #8b929c;
+  --color-dim: #5c636d;
+  --color-acc: #4ade80;
+  --color-accdim: #166534;
+  --color-red: #f87171;
+  --color-amber: #fbbf24;
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+html,
+body {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Helvetica, Arial, sans-serif;
+}
+
+::selection {
+  background: var(--color-accdim);
+  color: #fff;
+}
+
+/* Scrollbars inside the log panes shouldn't look like a system widget. */
+.thin-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.thin-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.thin-scroll::-webkit-scrollbar-thumb {
+  background: #23282f;
+  border-radius: 4px;
+}
+
+@keyframes foundry-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+.pulse {
+  animation: foundry-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes foundry-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.row-in {
+  animation: foundry-in 0.35s ease-out;
+}
