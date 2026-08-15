@@ -83,6 +83,17 @@ export interface OrgContext {
   dashboard: Record<string, string>;
 }
 
+export interface OpportunityDraft {
+  id: string;
+  title: string;
+  status: string;
+  num_participants: number;
+  estimated_duration_minutes: number | null;
+  pricing: { cost_per_participant_cents: number; total_cost_cents: number; currency: string } | null;
+  project_id: string;
+  created_at: string;
+}
+
 export class TeracClient {
   private readonly key: string;
 
@@ -155,6 +166,53 @@ export class TeracClient {
     return this.request<{ id: string; name: string; slug: string; dashboard_url: string | null }>(
       'POST', '/projects', { name },
     );
+  }
+
+  /**
+   * Create a draft opportunity — the listing itself, before any recruitment.
+   *
+   * A draft is free and starts nothing, which is what makes it the honest thing
+   * to create alongside a storefront: the work is really posted and really
+   * priced by Terac, but no participant is recruited and no money moves until
+   * someone launches it. The quote/launch pair above is the other path, and it
+   * spends.
+   *
+   * The shape was read off the live API's own validation errors. Two of the
+   * requirements are not obvious and are enforced server-side: an `activity`
+   * task must carry `duration_minutes` because it is what drives pricing, and
+   * an opportunity with no filters is rejected unless it explicitly records
+   * that recruiting anyone was a deliberate choice.
+   */
+  createOpportunity(input: {
+    title: string;
+    projectId: string;
+    numParticipants: number;
+    businessType: 'b2b' | 'b2c';
+    tasks: {
+      sequence: number;
+      taskType: 'interview' | 'file_upload' | 'activity';
+      reviewType: 'auto_approve' | 'manual_review' | 'self_report';
+      title: string;
+      description: string;
+      durationMinutes?: number;
+    }[];
+    unrestrictedAudience?: boolean;
+  }) {
+    return this.request<OpportunityDraft>('POST', '/opportunities', {
+      title: input.title,
+      project_id: input.projectId,
+      num_participants: input.numParticipants,
+      business_type: input.businessType,
+      unrestricted_audience: input.unrestrictedAudience ?? true,
+      tasks: input.tasks.map((t) => ({
+        sequence: t.sequence,
+        task_type: t.taskType,
+        review_type: t.reviewType,
+        title: t.title,
+        description: t.description,
+        ...(t.durationMinutes ? { duration_minutes: t.durationMinutes } : {}),
+      })),
+    });
   }
 
   stopOpportunity(opportunityId: string, reason?: string) {

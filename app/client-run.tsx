@@ -46,6 +46,7 @@ export interface HireOutcome {
   decision: string;
   reason: string;
   opportunityId: string | null;
+  dashboardUrl: string | null;
   targetPayoutCents: number;
   quotedCents: number | null;
 }

@@ -215,6 +215,133 @@ export async function hireForSegment(
   );
 }
 
+/**
+ * Post the work for one product as a Terac draft opportunity.
+ *
+ * This is the listing, not the purchase. Terac creates it, prices it and shows
+ * it on the org's dashboard, but recruits nobody and charges nothing until it
+ * is launched — which matters because eight of these are posted in one run, and
+ * launching them all would commit several times the account's balance. What the
+ * dashboard claims is therefore exactly true: the work behind each subscription
+ * is really posted, and no one has been paid yet.
+ *
+ * `hireForSegment` above is the other path. It quotes, checks the economics
+ * against the budget, and spends. Both write the same `labor_listings` row, so
+ * the P&L and the tile read one table whichever way the work was posted.
+ */
+export async function postListing(req: {
+  businessId: string;
+  productName: string;
+  role: string;
+  deliverable: string;
+  expertProfile: string;
+  productPriceCents: number;
+  durationMinutes?: number;
+  subscriberTarget?: number;
+  cycleId?: string;
+}): Promise<{
+  decision: 'posted' | 'declined';
+  reason: string;
+  opportunityId: string | null;
+  dashboardUrl: string | null;
+  quotedCents: number | null;
+  targetPayoutCents: number;
+  provider: string;
+}> {
+  const listingId = id('lst');
+  const share = env.laborPayoutShare;
+  const subscribers = req.subscriberTarget ?? env.subscriberTarget;
+  const targetPayoutCents = Math.round(req.productPriceCents * share * subscribers);
+  const cycleId = req.cycleId ?? decisions.newCycleId();
+
+  await query(
+    `INSERT INTO labor_listings
+       (id, segment_id, business_id, provider, role, expert_profile,
+        product_price_cents, payout_share, target_payout_cents, decision)
+     VALUES ($1,NULL,$2,'terac',$3,$4,$5,$6,$7,'pending')`,
+    [listingId, req.businessId, req.role, req.expertProfile, req.productPriceCents, share, targetPayoutCents],
+  );
+
+  const settle = async (
+    decision: 'posted' | 'declined',
+    reason: string,
+    opportunityId: string | null,
+    dashboardUrl: string | null,
+    quotedCents: number | null,
+  ) => {
+    await query(
+      `UPDATE labor_listings SET decision = $2, reason = $3, quoted_cents = $4,
+              opportunity_id = $5, resolved_at = now() WHERE id = $1`,
+      [listingId, decision, reason, quotedCents, opportunityId],
+    );
+    await decisions.record({
+      cycleId,
+      businessId: req.businessId,
+      action: 'LABOR_LISTED',
+      reasoning: reason,
+      confidence: decision === 'posted' ? 0.8 : 0.4,
+      model: 'terac',
+      inputs: { role: req.role, productPriceCents: req.productPriceCents, targetPayoutCents },
+      outputs: { opportunityId, dashboardUrl, quotedCents, decision },
+    });
+    return {
+      decision, reason, opportunityId, dashboardUrl, quotedCents, targetPayoutCents,
+      provider: 'terac',
+    };
+  };
+
+  if (!env.teracApiKey) {
+    return settle('declined', 'TERAC_API_KEY is not set, so no listing was posted.', null, null, null);
+  }
+
+  try {
+    const { TeracClient } = await import('./terac');
+    const client = new TeracClient(env.teracApiKey);
+
+    // One project per product, so the dashboard groups the work by the thing it
+    // delivers rather than piling every business into one list.
+    const project = await client.createProject(req.productName.slice(0, 80));
+
+    const draft = await client.createOpportunity({
+      title: `${req.productName} — ${req.role}`.slice(0, 120),
+      projectId: project.id,
+      numParticipants: 1,
+      businessType: 'b2b',
+      tasks: [
+        {
+          sequence: 1,
+          taskType: 'activity',
+          reviewType: 'manual_review',
+          title: `Produce this cycle's ${req.productName}`.slice(0, 120),
+          description: req.deliverable.slice(0, 900),
+          durationMinutes: req.durationMinutes ?? 90,
+        },
+      ],
+    });
+
+    const quotedCents = draft.pricing?.total_cost_cents ?? null;
+    return settle(
+      'posted',
+      `Terac listed "${draft.title}" as a draft opportunity` +
+        `${quotedCents === null ? '' : `, priced at $${(quotedCents / 100).toFixed(2)}`}. ` +
+        `The budget this product can fund is $${(targetPayoutCents / 100).toFixed(2)} ` +
+        `(${(share * 100).toFixed(0)}% of $${(req.productPriceCents / 100).toFixed(2)} across ` +
+        `${subscribers} subscribers). It recruits nobody until it is launched.`,
+      draft.id,
+      project.dashboard_url,
+      quotedCents,
+    );
+  } catch (err) {
+    return settle(
+      'declined',
+      `Terac refused the listing: ${err instanceof Error ? err.message : String(err)}`.slice(0, 400),
+      null,
+      null,
+      null,
+    );
+  }
+}
+
 export interface ListingRow {
   id: string;
   segment_id: string | null;
