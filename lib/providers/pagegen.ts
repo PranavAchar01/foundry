@@ -1,4 +1,5 @@
 import { env } from '@/lib/env';
+import { brain } from '@/lib/brain';
 import type { GeneratedPage, PagegenProvider, PageSpec } from './types';
 
 function esc(s: string): string {
@@ -142,9 +143,20 @@ export function renderTemplate(spec: PageSpec): string {
 }
 
 /**
- * Default, no-key implementation: deterministic internal templates. Fast
- * (single-digit milliseconds), which is most of the headroom in the sub-4-minute
- * spawn budget.
+ * The default implementation, and in practice the only one that runs: every
+ * storefront is authored here.
+ *
+ * It is called "internal" because it needs no sponsor key, not because it is a
+ * fallback. `lib/providers/poster.ts` deals the whole look — archetype, palette,
+ * type, motif, ratio, angle, motion — in TypeScript before the model is called,
+ * so eight pages built in the same minute are eight different designs rather
+ * than eight samples from whatever one prompt converges on. The model's job is
+ * to execute an assignment, not to have taste.
+ *
+ * The result is read back by `posterViolations` and given exactly one chance to
+ * be repaired. Two rejections and the deterministic template ships instead: a
+ * plain page is a worse tile, but a page that fails the checks is a broken
+ * storefront, and the checks cover things the checkout depends on.
  */
 export class InternalPagegenProvider implements PagegenProvider {
   readonly info = {
@@ -155,8 +167,64 @@ export class InternalPagegenProvider implements PagegenProvider {
   };
 
   async generate(spec: PageSpec): Promise<GeneratedPage> {
+    const {
+      appendPlumbing,
+      dealAssignment,
+      posterBrief,
+      posterViolations,
+      repairBrief,
+      POSTER_SYSTEM,
+      POSTER_TOOL,
+    } = await import('./poster');
+
+    const thinker = brain();
+    if (!thinker.info.configured) return { html: renderTemplate(spec), provider: 'internal' };
+
+    const brief = posterBrief(spec, dealAssignment(spec));
+
+    try {
+      let prompt = brief;
+      let last: string[] = [];
+
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const out = await thinker.structured<{ html: string }>({
+          system: POSTER_SYSTEM,
+          prompt,
+          tool: POSTER_TOOL,
+          // A full document with its own stylesheet does not fit in less.
+          maxTokens: 16000,
+        });
+
+        const html = stripFence(out.value.html ?? '');
+        last = posterViolations(html, spec);
+        // Checked before the plumbing goes in: the no-<script> rule is about
+        // what the model wrote, and appending first would fail every page.
+        if (!last.length) {
+          return { html: appendPlumbing(html, spec), provider: `internal:poster:${out.model}` };
+        }
+
+        prompt = repairBrief(brief, last);
+      }
+    } catch {
+      // A model having a bad minute must not cost the business its storefront;
+      // the template is always shippable.
+    }
+
     return { html: renderTemplate(spec), provider: 'internal' };
   }
+}
+
+/**
+ * Models wrap HTML in a markdown fence often enough to be worth handling here
+ * rather than spending a whole repair round on it.
+ */
+function stripFence(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed.startsWith('```')) return trimmed;
+  return trimmed
+    .replace(/^```[a-z]*\s*\n?/i, '')
+    .replace(/\n?```\s*$/, '')
+    .trim();
 }
 
 /**

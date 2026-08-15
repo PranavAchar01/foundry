@@ -4,8 +4,11 @@
 node_modules/
 .next/
 .vercel/
-dist/
-build/
+# Anchored to the repo root on purpose. Unanchored, `build/` matches a
+# directory of that name at any depth — which silently kept the whole
+# app/api/demo/build route out of git, and therefore out of the deploy.
+/dist/
+/build/
 *.log
 .DS_Store
 

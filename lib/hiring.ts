@@ -21,7 +21,12 @@ import type { LaborProvider } from './providers/types';
  */
 
 export interface HireRequest {
-  segmentId: string;
+  /**
+   * Null on the per-person path. A storefront built from one person's bio has
+   * no segment behind it, and inventing one to satisfy the column would put a
+   * market in the database that nobody clustered.
+   */
+  segmentId: string | null;
   businessId?: string | null;
   /** e.g. "AI research consultant". */
   role: string;
@@ -84,7 +89,7 @@ export async function hireForSegment(
         product_price_cents, payout_share, target_payout_cents, decision)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending')`,
     [
-      listingId, req.segmentId, req.businessId ?? null, provider.info.name,
+      listingId, req.segmentId || null, req.businessId ?? null, provider.info.name,
       req.role, req.expertProfile, req.productPriceCents, share, targetPayoutCents,
     ],
   );
@@ -227,4 +232,17 @@ export interface ListingRow {
 
 export async function listings(limit = 25): Promise<ListingRow[]> {
   return query<ListingRow>(`SELECT * FROM labor_listings ORDER BY created_at DESC LIMIT $1`, [limit]);
+}
+
+/**
+ * The listing already posted for a business, if there is one. Lets an idempotent
+ * rebuild report the hire it made the first time instead of reporting none and
+ * looking like the work was never posted.
+ */
+export async function listingFor(businessId: string): Promise<ListingRow | null> {
+  const rows = await query<ListingRow>(
+    `SELECT * FROM labor_listings WHERE business_id = $1 ORDER BY created_at DESC LIMIT 1`,
+    [businessId],
+  );
+  return rows[0] ?? null;
 }
