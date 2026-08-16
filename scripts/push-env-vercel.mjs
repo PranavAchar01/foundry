@@ -41,6 +41,9 @@ const KEYS = [
   // Binds the deployment's X account to one browser session. Without it in
   // production the owner cannot claim their own account back.
   'FOUNDRY_OWNER_KEY',
+  // Shared account versus per-visitor. Must be pushed: the code defaults to the
+  // safe direction, so an unpushed 'false' silently leaves production gated.
+  'FOUNDRY_X_MULTI_TENANT',
   // Product shape. These match the code defaults today, so leaving them behind
   // changed nothing — but it meant editing them locally would have had no
   // effect in production, which is a worse bug to find later.

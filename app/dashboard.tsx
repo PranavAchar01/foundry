@@ -233,7 +233,7 @@ export default function Dashboard() {
         </div>
       </section>
 
-      {xSession?.account ? null : <Connect state={xSession} onChange={setXSession} />}
+      <Connect state={xSession} onChange={setXSession} />
 
       {/* A slim status line under the painting. The company's own P&L is kept
           off the dashboard; what belongs here is whether it is running. */}
@@ -265,7 +265,11 @@ export default function Dashboard() {
         </div>
       )}
 
-      {xSession?.account && <ClientRun onPeople={setPeople} onSettled={refresh} />}
+      {/* Shared site: the run is always available. Multi-tenant: only once
+          this browser has connected its own account. */}
+      {(xSession && (!xSession.multiTenant || xSession.account)) && (
+        <ClientRun onPeople={setPeople} onSettled={refresh} />
+      )}
 
       {/* ---- the wall of companies ---- */}
       {tiles.length === 0 ? (

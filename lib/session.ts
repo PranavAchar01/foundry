@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { cookies } from 'next/headers';
 import { one, query } from './db';
 import { env } from './env';
+import type { XActor } from './x';
 
 /**
  * Per-visitor identity.
@@ -110,14 +111,18 @@ export async function describe(sessionId: string | null): Promise<{
   hasCredentials: boolean;
   account: SessionAccount | null;
   isOwner: boolean;
+  /** False means one shared account and no gate. The interface reads this. */
+  multiTenant: boolean;
 }> {
+  const multiTenant = env.xMultiTenant;
+
   if (!sessionId) {
-    return { hasSession: false, hasCredentials: false, account: null, isOwner: false };
+    return { hasSession: false, hasCredentials: false, account: null, isOwner: false, multiTenant };
   }
 
   const session = await byId(sessionId);
   if (!session) {
-    return { hasSession: false, hasCredentials: false, account: null, isOwner: false };
+    return { hasSession: false, hasCredentials: false, account: null, isOwner: false, multiTenant };
   }
 
   const account = await one<SessionAccount & { id: string }>(
@@ -132,6 +137,7 @@ export async function describe(sessionId: string | null): Promise<{
     // The owner is whoever holds the pre-existing server account, so their
     // connection survives this becoming multi-tenant.
     isOwner: account?.id === 'x_primary',
+    multiTenant,
   };
 }
 
@@ -153,17 +159,24 @@ export async function claimOwner(sessionId: string, key: string): Promise<boolea
 }
 
 /**
- * The actor for a visitor-driven request, or a reason to refuse.
+ * Who a visitor-driven request acts as, or a reason to refuse it.
  *
  * Every public entry point that spends money, reads a network, or writes to
- * someone goes through this. It returns a refusal rather than falling back to
- * the deployment's account, because the fallback is the exact failure sessions
- * exist to prevent and it fails silently: the run works, and it works as the
- * owner.
+ * someone goes through this, so the shared-versus-per-visitor decision is made
+ * in one place rather than repeated at each route.
+ *
+ * With FOUNDRY_X_MULTI_TENANT off this hands back the deployment's own account
+ * and refuses nobody: one shared identity, which is what a demo the owner
+ * drives wants. With it on, a visitor must bring their own X app and authorize
+ * their own account, and a missing one is refused rather than falling back —
+ * because the fallback is the failure sessions exist to prevent, and it fails
+ * silently: the run works, and it works as the owner.
  */
 export async function requireConnected(): Promise<
-  { ok: true; sessionId: string } | { ok: false; error: string }
+  { ok: true; actor: XActor } | { ok: false; error: string }
 > {
+  if (!env.xMultiTenant) return { ok: true, actor: 'server' };
+
   const sessionId = await currentId();
   if (!sessionId) return { ok: false, error: 'connect your own X account first' };
 
@@ -172,12 +185,12 @@ export async function requireConnected(): Promise<
   // The owner authorized against the deployment's own X app, before sessions
   // existed, so they have an account and no per-session credentials. Requiring
   // credentials of them would lock out the one account this preserves.
-  if (state.isOwner) return { ok: true, sessionId };
+  if (state.isOwner) return { ok: true, actor: { sessionId } };
 
   if (!state.hasCredentials) {
     return { ok: false, error: 'add your own X app credentials first' };
   }
   if (!state.account) return { ok: false, error: 'connect your own X account first' };
 
-  return { ok: true, sessionId };
+  return { ok: true, actor: { sessionId } };
 }
