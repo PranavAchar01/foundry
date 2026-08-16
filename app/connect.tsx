@@ -20,6 +20,8 @@ export interface SessionState {
   hasCredentials: boolean;
   account: { username: string; x_user_id: string; scope: string } | null;
   isOwner: boolean;
+  /** False means one shared account, so there is nothing to connect. */
+  multiTenant: boolean;
 }
 
 interface Props {
@@ -65,7 +67,8 @@ export default function Connect({ state, onChange }: Props) {
     }
   }, [clientId, clientSecret, onChange]);
 
-  if (state?.account) return null;
+  // Nothing to ask for when the site runs on one shared account.
+  if (!state?.multiTenant || state.account) return null;
 
   return (
     <section className="mx-auto max-w-[720px] px-6 py-14">

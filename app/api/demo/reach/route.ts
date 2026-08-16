@@ -20,9 +20,11 @@ export const maxDuration = 300;
  * and read again immediately before the follow and the DM, so a handle removed
  * mid-run is not written to by a request that started before the removal.
  *
- * The message goes out as the visitor's own X account, never the deployment's.
- * A request with no connected session is refused rather than falling back,
- * because the fallback would be a stranger messaging from the owner's handle.
+ * Whose account the message goes out as is decided by requireConnected: the
+ * deployment's own when the site is shared, the visitor's own when
+ * FOUNDRY_X_MULTI_TENANT is on. In the second case a request with no connected
+ * session is refused rather than falling back, because the fallback would be a
+ * stranger messaging from the owner's handle.
  */
 export async function POST(req: Request) {
   const body = (await req.json().catch(() => ({}))) as { runId?: string; username?: string };
@@ -34,12 +36,12 @@ export async function POST(req: Request) {
 
   if (!runId || !username) return fail('runId and username are required', 400);
 
-  const sessionId = await session.currentId();
-  if (!sessionId) return fail('connect your own X account before sending', 401);
-  const actor: x.XActor = { sessionId };
-  if (!(await x.account(actor))) {
-    return fail('connect your own X account before sending', 401);
-  }
+  // One decision, made in lib/session.ts: the deployment's own account when the
+  // site is shared, the visitor's own when it is not.
+  const gate = await session.requireConnected();
+  if (!gate.ok) return fail(gate.error, 401);
+  const actor: x.XActor = gate.actor;
+  if (!(await x.account(actor))) return fail('no X account connected', 401);
 
   try {
     const member = await cohort.isAllowed(username);

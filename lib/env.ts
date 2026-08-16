@@ -314,6 +314,22 @@ export const env = {
    * the key binds the existing account to a session; it never mints tokens and
    * never touches an account a visitor authorized.
    */
+  /**
+   * Whether each visitor must connect their own X account.
+   *
+   * Off, every visitor's run acts as the deployment's own account: one shared
+   * identity, one shared rate limit, messages from the owner's handle. That is
+   * the right shape for a demo the owner drives and the wrong shape for a site
+   * strangers can press buttons on.
+   *
+   * Defaults to on. The unsafe direction should require someone to have written
+   * it down, so losing the environment fails closed rather than quietly handing
+   * the next visitor the owner's account.
+   */
+  get xMultiTenant() {
+    return bool('FOUNDRY_X_MULTI_TENANT', true);
+  },
+
   get ownerKey() {
     return str('FOUNDRY_OWNER_KEY');
   },
