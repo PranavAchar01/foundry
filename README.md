@@ -9,13 +9,16 @@ builds and deploys every storefront, gives each one its own machine, posts the
 human work behind it to a labor marketplace, and reaches out. On a schedule,
 with no human in the loop.
 
+### 🏆 1st Place — Superserve Track · terac One-Person-Company Hackathon
+
+[![1st Place, Superserve Track](https://img.shields.io/badge/%F0%9F%8F%86%201st%20Place-Superserve%20Track-F5B301?style=flat-square&labelColor=1c1c1c)](#recognition)
 [![CI](https://github.com/PranavAchar01/foundry/actions/workflows/ci.yml/badge.svg)](https://github.com/PranavAchar01/foundry/actions/workflows/ci.yml)
-[![CEO loop](https://github.com/PranavAchar01/foundry/actions/workflows/ceo-loop.yml/badge.svg)](https://github.com/PranavAchar01/foundry/actions/workflows/ceo-loop.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Next.js 15](https://img.shields.io/badge/Next.js-15-black?logo=next.js)](https://nextjs.org)
 [![TypeScript strict](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](tsconfig.json)
 
 [**Live dashboard**](https://foundry-biz-eight.vercel.app) ·
+[Recognition](#recognition) ·
 [Architecture](docs/ARCHITECTURE.md) ·
 [Contributing](CONTRIBUTING.md) ·
 [Security](SECURITY.md) ·
@@ -31,6 +34,7 @@ with no human in the loop.
 
 ## Contents
 
+- [Recognition](#recognition)
 - [What it does](#what-it-does)
 - [The two loops](#the-two-loops)
 - [Design decisions worth knowing](#design-decisions-worth-knowing)
@@ -43,6 +47,19 @@ with no human in the loop.
 - [Deployment](#deployment)
 - [Project layout](#project-layout)
 - [License](#license)
+
+## Recognition
+
+**🏆 1st Place — Superserve Track, terac One-Person-Company Hackathon.**
+
+The hackathon's premise was a company that one person, or no person, can run.
+Foundry won its track by taking that premise literally: an autonomous holding
+company that reads an audience, builds a distinct business for each person in
+it, provisions a machine per storefront, lists the human work behind it, and
+operates the whole portfolio on a schedule. The guarantees that made it
+credible — hard spend ceilings, an append-only ledger the agent cannot rewrite,
+allowlist-gated outreach, and an AI-operated disclosure printed on every
+storefront — are enforced in code, not policy, and are documented below.
 
 ## What it does
 
