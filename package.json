@@ -22,13 +22,13 @@
     "band:register": "node scripts/band-register.mjs"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.71.0",
-    "@superserve/sdk": "^0.8.2",
-    "@vercel/sandbox": "^3.0.0",
+    "@anthropic-ai/sdk": "^0.121.0",
+    "@superserve/sdk": "^0.8.3",
+    "@vercel/sandbox": "^3.1.0",
     "next": "15.5.23",
     "pg": "^8.16.3",
-    "react": "19.1.1",
-    "react-dom": "19.1.1",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
     "stripe": "^18.5.0"
   },
   "devDependencies": {
@@ -36,7 +36,7 @@
     "@types/node": "^22.18.1",
     "@types/pg": "^8.15.5",
     "@types/react": "^19.1.13",
-    "@types/react-dom": "^19.1.9",
+    "@types/react-dom": "^19.2.5",
     "eslint": "^9.35.0",
     "eslint-config-next": "15.5.23",
     "playwright": "^1.62.1",
